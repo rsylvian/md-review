@@ -1,0 +1,66 @@
+{
+  "name": "md-review",
+  "version": "0.1.0",
+  "description": "Review AI-generated markdown in your browser; hand the comments back to the agent.",
+  "license": "MIT",
+  "author": "Romain Sylvian",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rsylvian/md-review.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rsylvian/md-review/issues"
+  },
+  "keywords": [
+    "markdown",
+    "review",
+    "cli",
+    "claude-code",
+    "agent"
+  ],
+  "//private": "Remove this to publish to npm.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "md-review": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "client",
+    "skill"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\"",
+    "//prepare": "Builds dist/ so `npm i -g <git-url>` yields a working binary. Inlined rather than `npm run build` because a nested npm run does not inherit node_modules/.bin on PATH during a git install.",
+    "prepare": "tsc && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\"",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npm run build && playwright test",
+    "docs": "node docs/build-docs.mjs"
+  },
+  "dependencies": {
+    "commander": "15.0.0",
+    "hast-util-to-html": "9.0.5",
+    "htm": "3.1.1",
+    "preact": "10.29.8",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "remark-rehype": "11.1.2",
+    "unified": "11.0.5",
+    "unist-util-visit": "5.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/node": "26.2.0",
+    "happy-dom": "20.11.2",
+    "typescript": "7.0.2",
+    "vite": "8.2.1",
+    "vitest": "4.1.10"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

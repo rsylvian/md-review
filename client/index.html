@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>md-review</title>
+    <script>
+      /*
+       * Runs before the stylesheet paints, so the page never flashes the wrong theme.
+       * Deliberately duplicates resolveTheme() from theme.js: it has to be inline and
+       * blocking, which a module import cannot be. Keep the two in step.
+       */
+      try {
+        var stored = localStorage.getItem('md-review:theme');
+        document.documentElement.dataset.theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    </script>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

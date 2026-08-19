@@ -1,0 +1,545 @@
+/* md-review — a reading surface first, a review tool second. */
+
+/*
+ * Palette follows Atlassian's, so the tool sits comfortably next to Confluence.
+ *
+ * Theming is driven by data-theme on <html>, resolved before first paint by the inline
+ * script in index.html: a stored preference wins, otherwise the OS decides. Keying off
+ * an attribute rather than @media means each token is defined exactly once and the
+ * manual toggle needs no extra rules.
+ *
+ * --on-accent exists because the accent inverts between schemes: dark blue in light
+ * mode, light blue in dark mode. Button text has to follow it or it fails contrast.
+ */
+:root {
+  color-scheme: light;
+
+  --bg: #f7f8f9;
+  --surface: #ffffff;
+  --text: #172b4d;
+  --muted: #626f86;
+  --line: #dcdfe4;
+  --subtle-bg: #f1f2f4;
+  --code-bg: #f1f2f4;
+
+  --accent: #0c66e4;
+  --accent-strong: #0055cc;
+  --accent-soft: #e9f2ff;
+  --on-accent: #ffffff;
+
+  --highlight: #cce0ff;
+  --highlight-active: #85b8ff;
+
+  --danger: #c9372c;
+  --shadow: 0 1px 1px rgb(9 30 66 / 12%), 0 2px 8px rgb(9 30 66 / 8%);
+
+  --doc-width: 48rem;
+  --card-width: 21rem;
+  /* Comments open as popovers over the text, so the document column is all there is. */
+  --content-width: var(--doc-width);
+
+  /*
+   * The gutter that lines the header up with the content beneath it. Everything that
+   * spans the window uses this as its horizontal padding, so the bar's background
+   * reaches the edges while its contents sit on the same column as the document.
+   *
+   * `100%` resolves against the element's containing block — body, or the viewport for
+   * fixed elements — which excludes the scrollbar. `100vw` would include it and throw
+   * the alignment off by half a scrollbar.
+   */
+  --gutter: max(1.5rem, calc((100% - var(--content-width)) / 2));
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #1d2125;
+  --surface: #22272b;
+  --text: #c7d1db;
+  --muted: #8c9bab;
+  --line: #38414a;
+  --subtle-bg: #2c333a;
+  --code-bg: #2c333a;
+
+  --accent: #579dff;
+  --accent-strong: #85b8ff;
+  --accent-soft: #082145;
+  --on-accent: #1d2125;
+
+  --highlight: #09326c;
+  --highlight-active: #0055cc;
+
+  --danger: #f87168;
+  --shadow: 0 1px 1px rgb(3 4 4 / 50%), 0 2px 8px rgb(3 4 4 / 35%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px/1.65 ui-serif,
+    Georgia,
+    'Iowan Old Style',
+    serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- chrome ---------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.7rem var(--gutter);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.85rem;
+}
+
+.topbar .file {
+  font-weight: 600;
+}
+
+.topbar .count {
+  position: relative;
+  color: var(--muted);
+  cursor: default;
+}
+
+/* Usage hint, parked behind a hover on the comment count. */
+.hint {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 17rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.1s ease-out,
+    visibility 0.1s ease-out;
+}
+
+.topbar .count:hover .hint,
+.topbar .count:focus-visible .hint {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* First of the right-hand controls, so it takes the slack. */
+.topbar .icon-button {
+  margin-left: auto;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  transition:
+    background-color 0.1s ease-out,
+    color 0.1s ease-out;
+}
+
+.icon-button:hover {
+  background: var(--subtle-bg);
+  color: var(--text);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.send,
+.primary {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  transition: background-color 0.1s ease-out;
+}
+
+.send:hover:not(:disabled),
+.primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.send:disabled,
+.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link:hover {
+  color: var(--text);
+}
+
+.link.danger:hover {
+  color: var(--danger);
+}
+
+.loading,
+.sent {
+  padding: 6rem 2rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  text-align: center;
+}
+
+.sent h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.4rem;
+}
+
+.error {
+  /* Sits on the document column, like the header contents. */
+  margin: 0.75rem var(--gutter);
+  max-width: var(--doc-width);
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--danger);
+  border-left-width: 3px;
+  border-radius: 3px;
+  color: var(--danger);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* ---------- the document ---------- */
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, var(--doc-width));
+  justify-content: center;
+  padding: 2.5rem var(--gutter) 8rem;
+}
+
+/* Positioning context for the popover, with the same box as the document. */
+.column {
+  position: relative;
+  min-width: 0;
+}
+
+#doc {
+  min-width: 0;
+}
+
+/* Rendered markdown */
+
+#doc > :first-child {
+  margin-top: 0;
+}
+
+#doc h1,
+#doc h2,
+#doc h3,
+#doc h4 {
+  margin: 2rem 0 0.6rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+#doc h1 {
+  font-size: 1.85rem;
+}
+#doc h2 {
+  font-size: 1.4rem;
+}
+#doc h3 {
+  font-size: 1.15rem;
+}
+
+#doc p,
+#doc ul,
+#doc ol,
+#doc blockquote,
+#doc table {
+  margin: 0 0 1.1rem;
+}
+
+#doc li {
+  margin-bottom: 0.3rem;
+}
+
+#doc blockquote {
+  margin-left: 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+}
+
+#doc code {
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.87em;
+}
+
+#doc pre {
+  overflow-x: auto;
+  margin: 0 0 1.2rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--code-bg);
+  line-height: 1.5;
+}
+
+#doc pre code {
+  padding: 0;
+  background: none;
+}
+
+#doc table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.93rem;
+}
+
+#doc th,
+#doc td {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+#doc th {
+  background: var(--subtle-bg);
+}
+
+#doc img {
+  max-width: 100%;
+}
+
+#doc hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2rem 0;
+}
+
+#doc a {
+  color: var(--accent);
+}
+
+/* ---------- commented passages ---------- */
+
+::highlight(md-review-comment) {
+  background-color: var(--highlight);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+::highlight(md-review-active) {
+  background-color: var(--highlight-active);
+}
+
+/* Used only where the Custom Highlight API is unavailable. */
+.md-fallback-highlight {
+  background-color: var(--highlight);
+  border-radius: 2px;
+}
+
+/* ---------- comment cards ---------- */
+
+/*
+ * A comment hangs below the passage it belongs to, over the text. Placed by popover.js:
+ * `top`/`left` arrive as inline styles, and stay hidden until they do.
+ */
+.popover {
+  position: absolute;
+  z-index: 5;
+  width: var(--card-width);
+  max-width: 100%;
+}
+
+.card {
+  position: relative;
+  padding: 0.7rem 0.85rem;
+  padding-right: 2.1rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: var(--shadow), 0 0 0 1px var(--accent);
+  border-color: var(--accent);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.83rem;
+}
+
+.card-close {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.quote {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  font-style: italic;
+  quotes: '“' '”';
+}
+
+.card .body {
+  margin: 0 0 0.5rem;
+  white-space: pre-wrap;
+}
+
+.card textarea {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.card textarea:focus-visible {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.tag {
+  display: block;
+  margin: 0.5rem 0 0.25rem;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.suggestion pre,
+.suggest-field {
+  margin: 0;
+}
+
+.suggestion pre {
+  overflow-x: auto;
+  padding: 0.45rem 0.55rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 3px 3px 0;
+  background: var(--accent-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+}
+
+.card footer {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 0.73rem;
+}
+
+.card footer .spacer {
+  margin-left: auto;
+}
+
+.lines {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- resolved strip ---------- */
+
+.resolved {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  max-width: min(30rem, 90vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0 4px 0 0;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.resolved summary {
+  padding: 0.5rem 1rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.resolved ul {
+  margin: 0;
+  padding: 0 1rem 0.8rem 1.4rem;
+}
+
+.resolved li {
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+}
+
+.resolved li .quote {
+  margin-bottom: 0.1rem;
+  text-decoration: line-through;
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 60rem) {
+  main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
