@@ -2,6 +2,7 @@ node_modules/
 dist/
 .md-review/
 .DS_Store
+docs/how-it-works.html
 *.log
 test-results/
 playwright-report/

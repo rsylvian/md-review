@@ -58,7 +58,7 @@ const round1 = [
 const report1 = formatReport({
   filePath: 'draft.md',
   open: round1,
-  resolved: [],
+  newlyResolved: [],
   generatedAt: '2026-08-13T18:00:00.000Z',
 });
 
@@ -68,12 +68,17 @@ const REVISED = DRAFT.replace(
   'Track p95 latency weekly.',
 ).replace('# Q3 Platform Plan\n', '# Q3 Platform Plan\n\nAdded during round one.\n');
 
-const { open: stillOpen, resolved } = reanchor(round1, REVISED, () => '2026-08-13T18:30:00.000Z');
+const { open: stillOpen, resolved, newlyResolved } = reanchor(
+  round1,
+  REVISED,
+  () => '2026-08-13T18:30:00.000Z',
+);
 
 const report2 = formatReport({
   filePath: 'draft.md',
   open: stillOpen,
-  resolved,
+  // What this round resolved, not everything ever resolved — see ReportInput.
+  newlyResolved,
   generatedAt: '2026-08-13T18:30:00.000Z',
 });
 
@@ -92,6 +97,7 @@ const MODULES = [
   ['src/cli.ts', 'argument parsing, lifecycle, writing the review out'],
   ['src/vendor.ts', 'locates htm/preact’s self-contained build'],
   ['src/skill.ts', 'installs the Claude Code skill'],
+  ['src/version.ts', 'reads the version this build reports'],
 ].map(([path, purpose]) => ({
   path,
   purpose,

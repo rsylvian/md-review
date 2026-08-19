@@ -7,6 +7,7 @@ import { startReviewServer } from './server.ts';
 import { sidecarPathFor } from './store.ts';
 import { resolveClientRuntime } from './vendor.ts';
 import { installSkill } from './skill.ts';
+import { readVersion } from './version.ts';
 
 /**
  * `md-review <file>` serves a markdown file for review and blocks until the reviewer is
@@ -109,6 +110,8 @@ const program = new Command();
 program
   .name('md-review')
   .description('Review a markdown file in the browser and hand the comments back to your agent.')
+  // Worth quoting in a bug report, so it goes to stdout like any other asked-for output.
+  .version(readVersion(PACKAGE_ROOT), '-v, --version', 'print the version and exit')
   .argument('[file]', 'markdown file to review')
   .option('-p, --port <number>', 'port to listen on', '5710')
   .option('--no-open', 'do not open a browser automatically')

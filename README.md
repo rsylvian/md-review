@@ -139,6 +139,7 @@ first" is enough.
 | `--no-open` | | don't launch a browser |
 | `--grace <ms>` | `1500` | how long after the tab closes before finalising |
 | `--install-skill` | | install the Claude Code skill and exit |
+| `-v, --version` | | print the version and exit |
 
 ## Notes and limits
 
@@ -176,15 +177,16 @@ yarn install       # also builds dist/, via the prepare script
 yarn test          # unit + server integration
 yarn test:e2e      # full browser loop; builds first, uses your installed Chrome
 yarn typecheck
-yarn docs          # regenerates docs/how-it-works.html from the real modules
+yarn docs          # writes docs/how-it-works.html
 ```
 
 `yarn test:e2e` drives your locally installed Google Chrome. If you don't have it, set
 `MD_REVIEW_CHANNEL=bundled` to use Playwright's own chromium instead — that's what CI
 does, after a `npx playwright install chromium`.
 
-[`docs/how-it-works.html`](docs/how-it-works.html) is a deep dive on the anchoring model.
-Its generator imports the real modules, so the page can't drift from the code.
+`yarn docs` builds a deep dive on the anchoring model at `docs/how-it-works.html`. It's
+generated rather than committed — the generator imports the real modules, so building it on
+demand is what keeps it from drifting from the code.
 
 The client runs with no bundler: Preact and htm are served as one self-contained ES module,
 so `client/` is the code that ships. `src/render.ts` stamps source offsets onto every
