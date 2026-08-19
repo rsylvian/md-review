@@ -15,28 +15,41 @@ close the tab it prints the review to stdout and exits.
 
 ## Install
 
-Needs **Node 22 or newer** (`.nvmrc` pins 22.14). The repo is private, so you need SSH
-access to it — check with `ssh -T git@github.com`.
+Needs **Node 22 or newer** (`.nvmrc` pins 22.14).
+
+The repo is private, so git needs credentials for it. Use HTTPS — the corporate network
+blocks SSH to GitHub on both port 22 and the usual 443 fallback:
 
 ```
-npm i -g git+ssh://git@github.com/rsylvian/md-review.git
-md-review --install-skill
+gh auth login       # pick HTTPS
+gh auth setup-git   # lets git authenticate private HTTPS clones
 ```
 
-The first line builds on install and puts `md-review` on your `PATH`. The second is
-optional and only useful if you run Claude Code — see [Claude Code](#claude-code).
+Then:
 
-To upgrade later, run the same install command again.
+```
+git clone https://github.com/rsylvian/md-review.git
+cd md-review
+yarn install        # installs deps and builds dist/ via the prepare script
+npm link            # puts md-review on your PATH, pointing at your clone
+md-review --install-skill   # optional, Claude Code only
+```
+
+`yarn` is the supported path — `packageManager` pins yarn 1.22 and `yarn.lock` is
+committed, so this is the combination that's actually tested. To upgrade, `git pull &&
+yarn install`.
 
 <details>
-<summary>From a clone instead</summary>
+<summary>One-line global install instead</summary>
 
 ```
-git clone git@github.com:rsylvian/md-review.git
-cd md-review
-yarn install        # builds dist/ as part of install
-npm link            # puts md-review on your PATH, pointing at your clone
+npm i -g git+https://github.com/rsylvian/md-review.git
 ```
+
+npm builds it on install via `prepare`, so this yields a working `md-review` with no clone.
+It resolves fresh from `package.json` rather than `yarn.lock` — fine, since every
+dependency is exact-pinned — but it needs working npm registry access, which is
+intermittent on the corporate network. If it stalls, use the clone above.
 
 </details>
 
