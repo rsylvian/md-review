@@ -16,6 +16,7 @@ const supported = typeof CSS !== 'undefined' && 'highlights' in CSS;
 const NAMES = {
   comment: 'md-review-comment',
   active: 'md-review-active',
+  activeApprox: 'md-review-active-approx',
 };
 
 /** @param {Element} root @param {number} start @param {number} end */
@@ -54,7 +55,9 @@ export function paintHighlights(root, comments, active) {
 
   const activeRanges =
     active === null ? [] : rangesForSource(root, active.startOffset, active.endOffset);
-  CSS.highlights.set(NAMES.active, new Highlight(...activeRanges));
+  const isApprox = active !== null && active.approx;
+  CSS.highlights.set(isApprox ? NAMES.activeApprox : NAMES.active, new Highlight(...activeRanges));
+  CSS.highlights.set(isApprox ? NAMES.active : NAMES.activeApprox, new Highlight());
 }
 
 /**

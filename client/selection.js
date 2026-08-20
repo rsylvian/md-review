@@ -26,6 +26,19 @@ function parsePos(element) {
   return Number.isFinite(a) && Number.isFinite(b) ? [a, b] : null;
 }
 
+/**
+ * Nearest block-level ancestor of `node` within `root`, or `root` itself.
+ * Used to detect whether two endpoints are in the same block.
+ */
+function nearestBlock(node, root) {
+  let current = node.nodeType === TEXT_NODE ? node.parentElement : node;
+  while (current !== null && current !== root) {
+    if (current.matches('p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td,th')) return current;
+    current = current.parentElement;
+  }
+  return root;
+}
+
 /** Nearest ancestor-or-self carrying data-pos, or null if we walk out of `root`. */
 function nearestPositioned(node, root) {
   let current = node.nodeType === ELEMENT_NODE ? node : node.parentNode;
@@ -118,7 +131,17 @@ export function anchorFromRange(range, root) {
   const endOffset = Math.max(start.offset, end.offset);
   if (endOffset <= startOffset) return null;
 
-  return { startOffset, endOffset, quote, approx: start.approx || end.approx };
+  // Detect cross-block snap: when Chrome places the start of a cross-block
+  // selection at offset 0 of a text node, it likely snapped the endpoint to
+  // the beginning of the block rather than the character under the cursor.
+  const snapped =
+    !start.approx &&
+    !end.approx &&
+    range.startOffset === 0 &&
+    range.startContainer.nodeType === TEXT_NODE &&
+    nearestBlock(range.startContainer, root) !== nearestBlock(range.endContainer, root);
+
+  return { startOffset, endOffset, quote, approx: start.approx || end.approx || snapped };
 }
 
 /**

@@ -381,6 +381,13 @@ main {
   background-color: var(--highlight-active);
 }
 
+/* Approximate anchor: block-start snap detected. Dotted underline signals imprecision. */
+::highlight(md-review-active-approx) {
+  background-color: var(--highlight-active);
+  text-decoration: underline dotted 2px;
+  text-underline-offset: 3px;
+}
+
 /* Used only where the Custom Highlight API is unavailable. */
 .md-fallback-highlight {
   background-color: var(--highlight);
@@ -426,7 +433,7 @@ main {
   margin-bottom: 0.4rem;
   color: var(--muted);
   font-style: italic;
-  quotes: '“' '”';
+  quotes: '”' '”';
 }
 
 .card .body {

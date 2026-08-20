@@ -194,7 +194,6 @@ function DraftCard({ draft, source, onChange, onSave, onCancel, saving }) {
       <button class="icon-button card-close" onClick=${onCancel} title="Cancel" aria-label="Cancel">
         <${CloseIcon} />
       </button>
-      <${Quote} text=${draft.anchor.quote} />
       <textarea
         ref=${textarea}
         rows="3"
