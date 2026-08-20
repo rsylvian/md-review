@@ -1,5 +1,5 @@
 {
-  "name": "md-review",
+  "name": "@rsylvian/md-review",
   "version": "0.1.0",
   "description": "Review AI-generated markdown in your browser; hand the comments back to the agent.",
   "license": "MIT",
@@ -18,8 +18,6 @@
     "claude-code",
     "agent"
   ],
-  "//private": "Remove this to publish to npm.",
-  "private": true,
   "type": "module",
   "bin": {
     "md-review": "./dist/cli.js"
@@ -31,6 +29,9 @@
   ],
   "engines": {
     "node": ">=26"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\"",
