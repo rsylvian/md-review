@@ -33,7 +33,7 @@ the command's output goes missing.
 
 The report leads with a count. Then one section per comment:
 
-```md
+````md
 ## 2 — lines 30–31 · suggested rewrite
 
 > We should probably measure this.
@@ -49,7 +49,7 @@ With:
 ```
 Track p95 latency weekly.
 ```
-```
+````
 
 - **`Replace:` / `With:` blocks are exact source text.** Apply them verbatim rather than
   paraphrasing — the reviewer wrote the replacement they want.
