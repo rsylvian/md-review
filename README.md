@@ -4,7 +4,7 @@ Review markdown in your browser, hand the comments back to the agent.
 
 ## Install
 
-Needs **Node 22 or newer**.
+Needs **Node 26 or newer**.
 
 **Clone:**
 ```
