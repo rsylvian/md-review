@@ -31,9 +31,9 @@ the command's output goes missing.
 
 ## Reading the report
 
-The report leads with a count. Then one section per comment:
+The report opens with `# Review of <path>`, then a count. Then one section per comment:
 
-```md
+````md
 ## 2 — lines 30–31 · suggested rewrite
 
 > We should probably measure this.
@@ -49,7 +49,7 @@ With:
 ```
 Track p95 latency weekly.
 ```
-```
+````
 
 - **`Replace:` / `With:` blocks are exact source text.** Apply them verbatim rather than
   paraphrasing — the reviewer wrote the replacement they want.
@@ -57,6 +57,9 @@ Track p95 latency weekly.
   file as it was when the review started.
 - **"No open comments"** means the draft reads fine. Say so and move on; do not invent
   changes to justify another round.
+- If any comments were resolved since the last round, the report ends with a
+  `## Resolved since last round` section listing them by line and first quoted line —
+  informational only, nothing to act on there.
 
 ## Iterating
 
