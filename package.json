@@ -30,7 +30,7 @@
     "skill"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\"",
