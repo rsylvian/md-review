@@ -25,10 +25,7 @@ export type ReportInput = {
 
 /** A fence long enough that `content` cannot terminate it early. */
 function fenceFor(content: string): string {
-  const longestRun = [...content.matchAll(/`+/g)].reduce(
-    (max, m) => Math.max(max, m[0].length),
-    0,
-  );
+  const longestRun = [...content.matchAll(/`+/g)].reduce((max, m) => Math.max(max, m[0].length), 0);
   return '`'.repeat(Math.max(3, longestRun + 1));
 }
 
@@ -85,12 +82,9 @@ export function formatReport(input: ReportInput): string {
   const lines: string[] = [`# Review of ${filePath}`, ''];
 
   const summary =
-    open.length === 0
-      ? 'No open comments.'
-      : `${plural(open.length, 'open comment')}.`;
+    open.length === 0 ? 'No open comments.' : `${plural(open.length, 'open comment')}.`;
   // "resolved" is an adjective here, not a countable noun — it takes no plural `s`.
-  const resolvedNote =
-    resolved.length > 0 ? ` ${resolved.length} resolved since last round.` : '';
+  const resolvedNote = resolved.length > 0 ? ` ${resolved.length} resolved since last round.` : '';
   lines.push(`${summary}${resolvedNote}`, '');
 
   if (open.length === 0) {
@@ -109,7 +103,10 @@ export function formatReport(input: ReportInput): string {
     lines.push('');
   }
 
-  return `${lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
+  return `${lines
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd()}\n`;
 }
 
 export type ReviewPayload = {

@@ -40,8 +40,7 @@ async function startReview(): Promise<Session> {
   return { dir, home, url, process: child };
 }
 
-const theme = (page: Page) =>
-  page.evaluate(() => document.documentElement.dataset.theme ?? null);
+const theme = (page: Page) => page.evaluate(() => document.documentElement.dataset.theme ?? null);
 
 const bodyBackground = (page: Page) =>
   page.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -102,9 +101,7 @@ test.describe('theme', () => {
     await expect(page.locator('#doc')).toBeVisible();
 
     expect(await theme(page)).toBe('dark');
-    expect(
-      await page.evaluate(() => localStorage.getItem('md-review:theme')),
-    ).toBe('dark');
+    expect(await page.evaluate(() => localStorage.getItem('md-review:theme'))).toBe('dark');
   });
 
   test('the chosen theme is applied before first paint', async ({ page }) => {

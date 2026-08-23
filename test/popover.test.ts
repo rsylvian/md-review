@@ -34,9 +34,7 @@ describe('passageAtPoint', () => {
   });
 
   it('hits a passage on any of the lines it wraps across', () => {
-    const passages = [
-      { id: 'a', rects: [rect(200, 0, 400, 20), rect(0, 20, 150, 40)] },
-    ];
+    const passages = [{ id: 'a', rects: [rect(200, 0, 400, 20), rect(0, 20, 150, 40)] }];
 
     expect(passageAtPoint(passages, { x: 100, y: 30 })).toBe('a');
   });

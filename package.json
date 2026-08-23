@@ -38,6 +38,8 @@
     "prepare": "tsc && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\"",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
@@ -55,6 +57,7 @@
     "unist-util-visit": "5.1.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.10",
     "@playwright/test": "1.62.1",
     "@types/node": "26.2.0",
     "@vitest/coverage-v8": "4.1.11",

@@ -57,7 +57,10 @@ async function startReview(source = DRAFT): Promise<Session> {
 
   // The CLI announces where it is listening on stderr.
   const url = await new Promise<string>((res, rej) => {
-    const timer = setTimeout(() => rej(new Error(`no URL announced; stderr was: ${stderr}`)), 10_000);
+    const timer = setTimeout(
+      () => rej(new Error(`no URL announced; stderr was: ${stderr}`)),
+      10_000,
+    );
     const check = (): void => {
       const match = /at (http:\/\/\S+)/.exec(stderr);
       if (match) {
@@ -244,7 +247,9 @@ test.describe('review loop', () => {
     await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
 
     // The draft's own button reports the save, which is the point of the flag.
-    await expect(page.locator('.card.draft').getByRole('button', { name: 'comment' })).toBeDisabled();
+    await expect(
+      page.locator('.card.draft').getByRole('button', { name: 'comment' }),
+    ).toBeDisabled();
 
     // The review, meanwhile, is not being sent.
     const send = page.locator('.topbar .send');
@@ -310,7 +315,9 @@ test.describe('review loop', () => {
     await expect(page.locator('.popover')).toHaveCount(0);
   });
 
-  test('clicking the empty space past the end of the document closes the card', async ({ page }) => {
+  test('clicking the empty space past the end of the document closes the card', async ({
+    page,
+  }) => {
     session = await startReview();
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(session.url);

@@ -78,4 +78,5 @@ yarn install
 yarn test          # unit + server integration
 yarn test:e2e      # full browser loop; builds first, uses your installed Chrome
 yarn typecheck
+yarn lint          # biome check .; yarn lint:fix to apply fixes
 ```

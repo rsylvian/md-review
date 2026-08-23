@@ -55,7 +55,7 @@ export function paintHighlights(root, comments, active) {
 
   const activeRanges =
     active === null ? [] : rangesForSource(root, active.startOffset, active.endOffset);
-  const isApprox = active !== null && active.approx;
+  const isApprox = active?.approx;
   CSS.highlights.set(isApprox ? NAMES.activeApprox : NAMES.active, new Highlight(...activeRanges));
   CSS.highlights.set(isApprox ? NAMES.active : NAMES.activeApprox, new Highlight());
 }

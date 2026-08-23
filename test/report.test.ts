@@ -92,7 +92,12 @@ describe('formatReport', () => {
   });
 
   it('says plainly when there is nothing to do', () => {
-    const report = formatReport({ filePath: 'draft.md', open: [], newlyResolved: [], generatedAt: AT });
+    const report = formatReport({
+      filePath: 'draft.md',
+      open: [],
+      newlyResolved: [],
+      generatedAt: AT,
+    });
 
     expect(report).toContain('No open comments');
     expect(report).not.toContain('## 1');
@@ -186,7 +191,11 @@ describe('buildPayload', () => {
       filePath: 'draft.md',
       open: [],
       newlyResolved: [
-        makeComment(DOC, 'the actual users', { id: 'r', status: 'resolved', resolvedBy: 'text-changed' }),
+        makeComment(DOC, 'the actual users', {
+          id: 'r',
+          status: 'resolved',
+          resolvedBy: 'text-changed',
+        }),
       ],
       generatedAt: AT,
     });

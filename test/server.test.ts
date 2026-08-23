@@ -385,7 +385,12 @@ describe('review server', () => {
             body: 'x',
             createdAt: 'earlier',
             status: 'open',
-            anchor: buildAnchor(DOC, start_, start_ + 'the actual users'.length, 'the actual users'),
+            anchor: buildAnchor(
+              DOC,
+              start_,
+              start_ + 'the actual users'.length,
+              'the actual users',
+            ),
           },
         ],
       }),
