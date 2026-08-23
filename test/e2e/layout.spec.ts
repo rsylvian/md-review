@@ -26,7 +26,7 @@ async function startReview(): Promise<Session> {
   // so this doesn't touch the real machine's ~/.cache.
   const child = spawn(process.execPath, [CLI, 'draft.md', '--no-open', '--port', '0'], {
     cwd: dir,
-    env: { ...process.env, HOME: home },
+    env: { ...process.env, HOME: home, USERPROFILE: home },
   });
   let stderr = '';
   child.stderr.on('data', (c: Buffer) => (stderr += c.toString()));

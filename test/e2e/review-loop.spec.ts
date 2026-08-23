@@ -43,7 +43,7 @@ async function startReview(source = DRAFT): Promise<Session> {
   // from the real machine's ~/.cache.
   const child = spawn(process.execPath, [CLI, 'draft.md', '--no-open', '--port', '0'], {
     cwd: dir,
-    env: { ...process.env, HOME: home },
+    env: { ...process.env, HOME: home, USERPROFILE: home },
   });
 
   let stdout = '';
@@ -452,7 +452,7 @@ test.describe('review loop', () => {
     // Round 2, same directory and $HOME so the sidecar carries over.
     const second = spawn(process.execPath, [CLI, 'draft.md', '--no-open', '--port', '0'], {
       cwd: session.dir,
-      env: { ...process.env, HOME: session.home },
+      env: { ...process.env, HOME: session.home, USERPROFILE: session.home },
     });
     let stderr = '';
     second.stderr.on('data', (c: Buffer) => (stderr += c.toString()));
