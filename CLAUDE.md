@@ -18,6 +18,7 @@ yarn build          # tsc -> dist/, then chmod +x dist/cli.js
 yarn dev            # tsc --watch
 yarn typecheck       # tsc --noEmit (src) + tsc -p tsconfig.test.json (src+test+client)
 yarn test            # vitest: unit + server integration tests, under test/
+yarn test:coverage   # same, plus a v8 coverage report (src/ only; no enforced threshold)
 yarn test:watch
 yarn test:e2e        # builds first, then runs Playwright specs in test/e2e against your installed Chrome
 ```
