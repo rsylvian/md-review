@@ -1,6 +1,5 @@
 node_modules/
 dist/
-.md-review/
 .DS_Store
 *.log
 test-results/

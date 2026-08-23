@@ -12,16 +12,22 @@ import { join } from 'node:path';
 
 const CLI = join(import.meta.dirname, '..', '..', 'dist', 'cli.js');
 
-type Session = { dir: string; url: string; process: ChildProcessWithoutNullStreams };
+type Session = { dir: string; home: string; url: string; process: ChildProcessWithoutNullStreams };
 
 async function startReview(): Promise<Session> {
   const dir = mkdtempSync(join(tmpdir(), 'md-review-layout-'));
+  const home = mkdtempSync(join(tmpdir(), 'md-review-layout-home-'));
   writeFileSync(
     join(dir, 'draft.md'),
     '# Q3 Platform Plan\n\nThe system serves the actual users of this thing.\n\n## Goals\n\n- Ship it\n',
   );
 
-  const child = spawn(process.execPath, [CLI, 'draft.md', '--no-open', '--port', '0'], { cwd: dir });
+  // Sidecars live under $HOME now, not the reviewed project — point it at a scratch dir
+  // so this doesn't touch the real machine's ~/.cache.
+  const child = spawn(process.execPath, [CLI, 'draft.md', '--no-open', '--port', '0'], {
+    cwd: dir,
+    env: { ...process.env, HOME: home },
+  });
   let stderr = '';
   child.stderr.on('data', (c: Buffer) => (stderr += c.toString()));
 
@@ -38,7 +44,7 @@ async function startReview(): Promise<Session> {
     check();
   });
 
-  return { dir, url, process: child };
+  return { dir, home, url, process: child };
 }
 
 async function edges(page: Page, selector: string): Promise<{ left: number; right: number }> {
@@ -52,6 +58,7 @@ let session: Session;
 test.afterEach(() => {
   session?.process.kill('SIGKILL');
   if (session?.dir !== undefined) rmSync(session.dir, { recursive: true, force: true });
+  if (session?.home !== undefined) rmSync(session.home, { recursive: true, force: true });
 });
 
 test.describe('layout', () => {

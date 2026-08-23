@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { Anchor, Comment } from './anchors.ts';
 
 /**
@@ -16,8 +18,8 @@ export type StoredReview = {
   updatedAt: string;
 };
 
-/** Directory name, relative to the review root, holding all sidecars. */
-export const SIDECAR_DIR = '.md-review';
+/** Directory name, under the user's cache home, holding all sidecars. */
+export const SIDECAR_DIR = 'md-review';
 
 function slugify(value: string): string {
   return (
@@ -30,15 +32,20 @@ function slugify(value: string): string {
 }
 
 /**
- * Where a target file's comments live. Nested paths are flattened into one slug, so
- * `docs/specs/plan.md` becomes `.md-review/docs-specs-plan.json` and cannot collide
- * with a `plan.md` elsewhere in the tree.
+ * Where a target file's comments live: `~/.cache/md-review/<slug>-<hash>.json`. Sidecars
+ * are keyed by the file's absolute path (hashed, since two paths can slugify the same —
+ * `docs/specs/plan.md` and `docs-specs-plan.md` both become `docs-specs-plan`) and stored
+ * outside the reviewed project entirely, so nothing needs gitignoring and review state
+ * survives being run from any cwd.
  */
-export function sidecarPathFor(targetFile: string, root: string = process.cwd()): string {
+export function sidecarPathFor(
+  targetFile: string,
+  root: string = process.cwd(),
+  cacheHome: string = homedir(),
+): string {
   const absolute = isAbsolute(targetFile) ? targetFile : resolve(root, targetFile);
-  const rel = relative(root, absolute);
-  // A file outside the root ("../notes.md") still gets a stable name of its own.
-  return join(root, SIDECAR_DIR, `${slugify(rel)}.json`);
+  const hash = createHash('sha1').update(absolute).digest('hex').slice(0, 8);
+  return join(cacheHome, '.cache', SIDECAR_DIR, `${slugify(absolute)}-${hash}.json`);
 }
 
 function isAnchor(value: unknown): value is Anchor {
