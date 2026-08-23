@@ -15,6 +15,15 @@ export default defineConfig({
       // Only src/ is exercised by this run; client/ has no test coverage of its own yet,
       // and test/e2e's Playwright specs aren't part of this process.
       include: ['src/**'],
+      exclude: ['src/cli.ts'],
+      // A floor a little under today's baseline (93/84/97/97), so it catches a real
+      // regression without being brittle against small, legitimate coverage wobble.
+      thresholds: {
+        statements: 90,
+        branches: 80,
+        functions: 90,
+        lines: 90,
+      },
     },
   },
 });
