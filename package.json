@@ -40,8 +40,7 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run build && playwright test",
-    "docs": "node docs/build-docs.mjs"
+    "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
     "commander": "15.0.0",
