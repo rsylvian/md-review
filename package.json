@@ -39,6 +39,7 @@
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test"
   },
@@ -56,6 +57,7 @@
   "devDependencies": {
     "@playwright/test": "1.62.1",
     "@types/node": "26.2.0",
+    "@vitest/coverage-v8": "4.1.11",
     "happy-dom": "20.11.6",
     "typescript": "7.0.2",
     "vite": "8.2.2",

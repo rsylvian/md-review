@@ -21,7 +21,7 @@ jobs:
 
       - run: yarn typecheck
 
-      - run: yarn test
+      - run: yarn test:coverage
 
       # The runner has no Google Chrome, so use Playwright's own chromium.
       - run: npx playwright install --with-deps chromium
