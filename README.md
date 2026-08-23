@@ -1,5 +1,8 @@
 # md-review
 
+[![CI](https://github.com/rsylvian/md-review/actions/workflows/ci.yml/badge.svg)](https://github.com/rsylvian/md-review/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Review markdown in your browser, hand the comments back to the agent.
 
 ## Install
