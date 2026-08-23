@@ -26,6 +26,7 @@ const DRAFT = [
 
 type Session = {
   dir: string;
+  home: string;
   url: string;
   process: ChildProcessWithoutNullStreams;
   /** Resolves with stdout — the review the agent receives — once the CLI exits. */
@@ -34,10 +35,15 @@ type Session = {
 
 async function startReview(source = DRAFT): Promise<Session> {
   const dir = mkdtempSync(join(tmpdir(), 'md-review-e2e-'));
+  const home = mkdtempSync(join(tmpdir(), 'md-review-e2e-home-'));
   writeFileSync(join(dir, 'draft.md'), source);
 
+  // Sidecars live under the cache home (os.homedir(), which respects $HOME) rather than
+  // inside the reviewed project, so tests point $HOME at a scratch dir to stay isolated
+  // from the real machine's ~/.cache.
   const child = spawn(process.execPath, [CLI, 'draft.md', '--no-open', '--port', '0'], {
     cwd: dir,
+    env: { ...process.env, HOME: home, USERPROFILE: home },
   });
 
   let stdout = '';
@@ -63,7 +69,7 @@ async function startReview(source = DRAFT): Promise<Session> {
     check();
   });
 
-  return { dir, url, process: child, output };
+  return { dir, home, url, process: child, output };
 }
 
 /**
@@ -125,6 +131,7 @@ test.describe('review loop', () => {
   test.afterEach(async () => {
     session?.process.kill('SIGKILL');
     if (session?.dir !== undefined) rmSync(session.dir, { recursive: true, force: true });
+    if (session?.home !== undefined) rmSync(session.home, { recursive: true, force: true });
   });
 
   test('a comment left in the browser reaches the agent when the tab closes', async ({ page }) => {
@@ -376,9 +383,16 @@ test.describe('review loop', () => {
     await session.output;
 
     // The sidecar carries state to the next round; the report is for the agent to read.
-    const dir = join(session.dir, '.md-review');
-    expect(readdirSync(dir).sort()).toEqual(['draft.json', 'draft.review.md']);
-    expect(readFileSync(join(dir, 'draft.review.md'), 'utf8')).toContain('saved to disk');
+    // It lives under the cache home, not the reviewed project, so nothing needs gitignoring.
+    const dir = join(session.home, '.cache', 'md-review');
+    const files = readdirSync(dir).sort();
+    expect(files).toHaveLength(2);
+    const jsonFile = files.find((f) => f.endsWith('.json'));
+    const reportFile = files.find((f) => f.endsWith('.review.md'));
+    expect(jsonFile).toBeDefined();
+    expect(reportFile).toBeDefined();
+    expect(reportFile!.replace(/\.review\.md$/, '')).toBe(jsonFile!.replace(/\.json$/, ''));
+    expect(readFileSync(join(dir, reportFile!), 'utf8')).toContain('saved to disk');
   });
 
   test('a comment can be deleted before sending', async ({ page }) => {
@@ -435,9 +449,10 @@ test.describe('review loop', () => {
     const file = join(session.dir, 'draft.md');
     writeFileSync(file, readFileSync(file, 'utf8').replace('consectetur', 'data engineers'));
 
-    // Round 2, same directory so the sidecar carries over.
+    // Round 2, same directory and $HOME so the sidecar carries over.
     const second = spawn(process.execPath, [CLI, 'draft.md', '--no-open', '--port', '0'], {
       cwd: session.dir,
+      env: { ...process.env, HOME: session.home, USERPROFILE: session.home },
     });
     let stderr = '';
     second.stderr.on('data', (c: Buffer) => (stderr += c.toString()));

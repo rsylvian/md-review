@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { startReviewServer, type ReviewServer } from '../src/server.ts';
 import { loadReview, sidecarPathFor } from '../src/store.ts';
 import { buildAnchor } from '../src/anchors.ts';
@@ -25,13 +25,14 @@ const VENDOR_FILE = join(
 );
 
 let root: string;
+let home: string;
 let server: ReviewServer;
 
 async function start(overrides: Partial<Parameters<typeof startReviewServer>[0]> = {}) {
   server = await startReviewServer({
     filePath: 'draft.md',
     source: DOC,
-    sidecarPath: sidecarPathFor('draft.md', root),
+    sidecarPath: sidecarPathFor('draft.md', root, home),
     clientDir: CLIENT_DIR,
     vendorFile: VENDOR_FILE,
     port: 0,
@@ -76,11 +77,13 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'md-review-server-'));
+  home = mkdtempSync(join(tmpdir(), 'md-review-home-'));
 });
 
 afterEach(async () => {
   await server?.close();
   rmSync(root, { recursive: true, force: true });
+  rmSync(home, { recursive: true, force: true });
 });
 
 describe('review server', () => {
@@ -138,7 +141,7 @@ describe('review server', () => {
 
   it('writes through to the sidecar on every mutation', async () => {
     const { url } = await start();
-    const sidecar = sidecarPathFor('draft.md', root);
+    const sidecar = sidecarPathFor('draft.md', root, home);
 
     await postComment(url, 'the actual users', 'name them');
 
@@ -198,7 +201,7 @@ describe('review server', () => {
 
     const doc = await (await fetch(`${url}/api/doc`)).json();
     expect(doc.open).toHaveLength(0);
-    expect(loadReview(sidecarPathFor('draft.md', root))!.comments).toHaveLength(0);
+    expect(loadReview(sidecarPathFor('draft.md', root, home))!.comments).toHaveLength(0);
   });
 
   it('404s when deleting something that is not there', async () => {
@@ -279,8 +282,8 @@ describe('review server', () => {
 
   it('auto-resolves last round’s comments whose text the agent rewrote', async () => {
     // Seed a sidecar as if a previous round had left two comments.
-    const sidecar = sidecarPathFor('draft.md', root);
-    mkdirSync(join(root, '.md-review'), { recursive: true });
+    const sidecar = sidecarPathFor('draft.md', root, home);
+    mkdirSync(dirname(sidecar), { recursive: true });
     const anchorOn = (needle: string) => {
       const start = DOC.indexOf(needle);
       return buildAnchor(DOC, start, start + needle.length, needle);
@@ -321,8 +324,8 @@ describe('review server', () => {
   });
 
   it('reports only the comments resolved this round, not every one ever resolved', async () => {
-    const sidecar = sidecarPathFor('draft.md', root);
-    mkdirSync(join(root, '.md-review'), { recursive: true });
+    const sidecar = sidecarPathFor('draft.md', root, home);
+    mkdirSync(dirname(sidecar), { recursive: true });
     const anchorOn = (needle: string) => {
       const start = DOC.indexOf(needle);
       return buildAnchor(DOC, start, start + needle.length, needle);
@@ -368,8 +371,8 @@ describe('review server', () => {
   });
 
   it('persists auto-resolutions immediately, before any new interaction', async () => {
-    const sidecar = sidecarPathFor('draft.md', root);
-    mkdirSync(join(root, '.md-review'), { recursive: true });
+    const sidecar = sidecarPathFor('draft.md', root, home);
+    mkdirSync(dirname(sidecar), { recursive: true });
     const start_ = DOC.indexOf('the actual users');
     writeFileSync(
       sidecar,

@@ -26,8 +26,9 @@ Use `run_in_background: true`. Then:
    command exits.
 3. On the completion notification, read the command's output file. It contains the report.
 
-The same report is also written to `.md-review/<name>.review.md`, so it is still there if
-the command's output goes missing.
+The same report is also written to a `.review.md` file under `~/.cache/md-review/`, so it
+is still there if the command's output goes missing (the CLI prints the exact path to
+stderr as `Saved to ...`).
 
 ## Reading the report
 
