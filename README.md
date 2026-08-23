@@ -69,7 +69,7 @@ first" is enough.
 - **One file per session.**
 - **The document is read once.** Editing the file while a review is open won't update the page.
 - **Raw HTML in markdown is dropped** rather than rendered.
-- Comments live in `~/.cache/md-review/`, outside the reviewed project, so there's nothing to gitignore.
+- Comments live in `~/.cache/md-review/`.
 
 ## Development
 
