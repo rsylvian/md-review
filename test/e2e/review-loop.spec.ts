@@ -24,6 +24,19 @@ const DRAFT = [
   'We should probably measure this.',
 ].join('\n');
 
+/**
+ * Fixtures for the within-paragraph selection bug (issue #15): adjacent inline runs
+ * with no space-free boundary, and an escaped sentence, both real browser hit-testing
+ * surfaces that happy-dom-based unit tests can't reproduce.
+ */
+const BOUNDARY_DRAFT = [
+  '# Boundary Cases',
+  '',
+  'A run of **bold text** next to *italic prose* sits here.',
+  '',
+  'Escapes: \\*not sturdy\\* here.',
+].join('\n');
+
 type Session = {
   dir: string;
   home: string;
@@ -126,6 +139,44 @@ async function selectWord(page: Page, word: string): Promise<void> {
 async function clickWord(page: Page, word: string): Promise<void> {
   const box = await wordBox(page, word);
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+/** Double-clicks a word, the way native browser word-selection is triggered. */
+async function doubleClickWord(page: Page, word: string): Promise<void> {
+  const box = await wordBox(page, word);
+  await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+/**
+ * Drags from the start of `fromWord` and releases exactly on the last pixel of
+ * `toWord` — the way a reviewer's drag lands right on a formatting boundary (real
+ * mouse hit-testing there often reports an Element-container Range, not a Text one).
+ */
+async function dragBoundary(page: Page, fromWord: string, toWord: string): Promise<void> {
+  const from = await wordBox(page, fromWord);
+  const to = await wordBox(page, toWord);
+  await page.mouse.move(from.x + 1, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width - 1, to.y + to.height / 2, { steps: 12 });
+  await page.mouse.up();
+}
+
+/** Saves a draft comment with the given body, the way `selectWord`/`doubleClickWord` set up. */
+async function saveComment(page: Page, body: string): Promise<void> {
+  const draft = page.locator('.card.draft');
+  await expect(draft).toBeVisible();
+  await draft.locator('textarea').first().fill(body);
+  await draft.getByRole('button', { name: 'comment' }).click();
+  await expect(page.locator('.card:not(.draft)')).toHaveCount(1);
+}
+
+/** The text actually highlighted for the saved comment, read back from the live DOM. */
+async function highlightedText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const highlight = CSS.highlights.get('md-review-comment');
+    if (highlight === undefined) return '';
+    return [...highlight].map((range) => range.toString()).join('');
+  });
 }
 
 test.describe('review loop', () => {
@@ -292,6 +343,23 @@ test.describe('review loop', () => {
       return highlight === undefined ? 0 : highlight.size;
     });
     expect(highlighted).toBeGreaterThan(0);
+  });
+
+  test('selecting new text while a draft is open does not discard it', async ({ page }) => {
+    session = await startReview();
+    await page.goto(session.url);
+
+    await selectWord(page, 'consectetur');
+    const draft = page.locator('.card.draft');
+    await expect(draft).toBeVisible();
+    await draft.locator('textarea').first().fill('unsaved thoughts');
+
+    // Selecting a different passage without saving or cancelling first must not
+    // silently discard the draft already in progress.
+    await selectWord(page, 'Goals');
+
+    await expect(draft).toBeVisible();
+    await expect(draft.locator('textarea').first()).toHaveValue('unsaved thoughts');
   });
 
   test('a saved comment stays out of the way until its passage is clicked', async ({ page }) => {
@@ -482,5 +550,91 @@ test.describe('review loop', () => {
     } finally {
       second.kill('SIGKILL');
     }
+  });
+
+  test('double-clicking a word next to an escape highlights only that word', async ({ page }) => {
+    session = await startReview(BOUNDARY_DRAFT);
+    await page.goto(session.url);
+
+    await doubleClickWord(page, 'sturdy');
+    await saveComment(page, 'x');
+
+    expect(await highlightedText(page)).toBe('sturdy');
+
+    await page.close();
+    const { stdout } = await session.output;
+    expect(stdout).toContain('> sturdy');
+    expect(stdout).not.toContain('> Escapes: *not sturdy* here.');
+  });
+
+  test('double-clicking a word inside emphasis, next to plain text, highlights only that word', async ({
+    page,
+  }) => {
+    session = await startReview(BOUNDARY_DRAFT);
+    await page.goto(session.url);
+
+    await doubleClickWord(page, 'italic');
+    await saveComment(page, 'x');
+
+    expect(await highlightedText(page)).toBe('italic');
+
+    await page.close();
+    const { stdout } = await session.output;
+    expect(stdout).toContain('> italic');
+  });
+
+  test('a drag released exactly on a formatting boundary highlights exactly what was dragged', async ({
+    page,
+  }) => {
+    session = await startReview(BOUNDARY_DRAFT);
+    await page.goto(session.url);
+
+    await dragBoundary(page, 'run', 'text');
+    await saveComment(page, 'x');
+
+    const highlighted = await highlightedText(page);
+    expect(highlighted).toBe('run of bold text');
+    expect(highlighted).not.toContain('sits here');
+
+    await page.close();
+    const { stdout } = await session.output;
+    expect(stdout).toContain('> run of bold text');
+    expect(stdout).not.toContain('sits here');
+  });
+
+  test('a drag that ends outside the document still opens a draft', async ({ page }) => {
+    // A drag released past the top edge of the document lands on the sticky topbar
+    // (a sibling of #doc, not a descendant) rather than on the document itself. The
+    // browser's own Selection still extends correctly; the app must still notice.
+    session = await startReview();
+    await page.goto(session.url);
+    await page.locator('#doc [data-pos]').first().waitFor();
+
+    await page.evaluate(() => {
+      const root = document.getElementById('doc')!;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let headingNode: Text | null = null;
+      let endNode: Text | null = null;
+      let node = walker.nextNode() as Text | null;
+      while (node !== null) {
+        if (headingNode === null && node.data.includes('Goals')) headingNode = node;
+        if (node.data.includes('works well.')) endNode = node;
+        node = walker.nextNode() as Text | null;
+      }
+      const range = document.createRange();
+      range.setStart(endNode!, endNode!.data.indexOf('works well.'));
+      range.setEnd(headingNode!, headingNode!.data.indexOf('Goals') + 'Goals'.length);
+
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      document
+        .querySelector('.topbar')!
+        .dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    });
+
+    const draft = page.locator('.card.draft');
+    await expect(draft).toBeVisible();
   });
 });

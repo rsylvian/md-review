@@ -394,6 +394,23 @@ main {
   border-radius: 2px;
 }
 
+/*
+ * render.ts can wrap one comment's passage in several adjacent spans (e.g. split
+ * around an escape or entity token). Without this, each span would round all four
+ * corners independently and the highlight would look scalloped instead of one
+ * contiguous block — squaring off the touching edges between adjacent spans restores
+ * a single smooth shape.
+ */
+.md-fallback-highlight + .md-fallback-highlight {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.md-fallback-highlight:has(+ .md-fallback-highlight) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 /* ---------- comment cards ---------- */
 
 /*

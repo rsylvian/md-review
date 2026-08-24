@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkRehype from 'remark-rehype';
 import { toHtml } from 'hast-util-to-html';
 import { visit, SKIP } from 'unist-util-visit';
+import { decodeString } from 'micromark-util-decode-string';
 import type { Element, Root, Text } from 'hast';
 import type { Node } from 'unist';
 
@@ -16,10 +17,11 @@ import type { Node } from 'unist';
  * The client turns a browser selection into source offsets by reading these, which is
  * what lets a comment survive the agent rewriting the document around it.
  *
- * A span marked `data-approx` means offsets inside it are not linear — escapes
- * (`\*` renders as `*`) and entities (`&amp;` renders as `&`) make rendered text
- * shorter than its source. Those spans cover the whole run and callers must treat the
- * range as a whole rather than indexing into it.
+ * A span marked `data-approx` means offsets inside it are not linear: it's either a
+ * single escape (`\*` renders as `*`) or entity (`&amp;` renders as `&`) token, whose
+ * rendered text is shorter than its source, or (as a defensive fallback) a whole run
+ * that couldn't be segmented at all. Callers must treat such a span's range as a whole
+ * rather than indexing into it.
  */
 
 /** Source range, as [startOffset, endOffset). */
@@ -75,10 +77,72 @@ function exactRange(source: string, candidate: Range, value: string): Range | nu
   return [start, start + value.length];
 }
 
-function wrapText(node: Text, range: Range, approx: boolean): Element {
+function wrapText(value: string, range: Range, approx: boolean): Element {
   const properties: Element['properties'] = { dataPos: `${range[0]}:${range[1]}` };
   if (approx) properties.dataApprox = '';
-  return { type: 'element', tagName: 'span', properties, children: [node] };
+  return { type: 'element', tagName: 'span', properties, children: [{ type: 'text', value }] };
+}
+
+/** Matches a single backslash-escape or character reference, mirroring CommonMark's grammar. */
+const ESCAPE_OR_REFERENCE =
+  /\\([!-/:-@[-`{-~])|&(#(?:\d{1,7}|[xX][\da-fA-F]{1,6})|[a-zA-Z][a-zA-Z0-9]{1,31});/g;
+
+type Segment = { range: Range; text: string; approx: boolean };
+
+/**
+ * Splits a raw source slice into literal runs (exact) and individual escape/entity
+ * tokens (approx, atomic) instead of giving up on the whole run. Returns null when the
+ * decoded segments don't reconstruct `value` exactly, so the caller can fall back.
+ */
+function segmentEscapes(source: string, candidate: Range, value: string): Segment[] | null {
+  const raw = source.slice(candidate[0], candidate[1]);
+  const segments: Segment[] = [];
+  let cursor = 0;
+  let rebuilt = '';
+
+  ESCAPE_OR_REFERENCE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  // biome-ignore lint/suspicious/noAssignInExpressions: standard exec-loop idiom
+  while ((match = ESCAPE_OR_REFERENCE.exec(raw)) !== null) {
+    if (match.index > cursor) {
+      const literal = raw.slice(cursor, match.index);
+      segments.push({
+        range: [candidate[0] + cursor, candidate[0] + match.index],
+        text: literal,
+        approx: false,
+      });
+      rebuilt += literal;
+    }
+    const decoded = decodeString(match[0]);
+    const tokenStart = candidate[0] + match.index;
+    segments.push({
+      range: [tokenStart, tokenStart + match[0].length],
+      text: decoded,
+      approx: true,
+    });
+    rebuilt += decoded;
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < raw.length) {
+    const literal = raw.slice(cursor);
+    segments.push({
+      range: [candidate[0] + cursor, candidate[0] + raw.length],
+      text: literal,
+      approx: false,
+    });
+    rebuilt += literal;
+  }
+
+  return segments.length > 0 && rebuilt === value ? segments : null;
+}
+
+/** Builds the span(s) for one text node: exact match, else segmented, else whole-run approx. */
+function buildSpans(source: string, node: Text, candidate: Range): Element[] {
+  const exact = exactRange(source, candidate, node.value);
+  if (exact) return [wrapText(node.value, exact, false)];
+  const segments = segmentEscapes(source, candidate, node.value);
+  if (segments) return segments.map((seg) => wrapText(seg.text, seg.range, seg.approx));
+  return [wrapText(node.value, candidate, true)];
 }
 
 /** Stamps data-pos across the tree. Runs after remark-rehype, before serialization. */
@@ -91,8 +155,10 @@ function stampPositions(source: string) {
 
     visit(tree, 'text', (node, index, parent) => {
       if (parent === undefined || index === undefined) return;
-      // Whitespace between blocks is remark-rehype's own formatting, not content.
-      if (node.value.trim() === '') return;
+      // Whitespace between blocks is remark-rehype's own synthetic formatting, not
+      // content, and carries no source position. Genuine inline whitespace (e.g. the
+      // space between `**bold**` and `*italic*`) has a real position and is content.
+      if (node.value.trim() === '' && rangeOf(node) === null) return;
       if (parent.type === 'element' && NO_TEXT_CHILDREN.has(parent.tagName)) return;
 
       // Fenced code and a few other constructs produce text without its own position;
@@ -101,9 +167,9 @@ function stampPositions(source: string) {
         rangeOf(node) ?? (parent.type === 'element' ? parseRange(parent.properties.dataPos) : null);
       if (!candidate) return;
 
-      const exact = exactRange(source, candidate, node.value);
-      parent.children[index] = wrapText(node, exact ?? candidate, exact === null);
-      return [SKIP, index + 1];
+      const spans = buildSpans(source, node, candidate);
+      parent.children.splice(index, 1, ...spans);
+      return [SKIP, index + spans.length];
     });
   };
 }

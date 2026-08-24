@@ -1115,7 +1115,7 @@ micromark-util-decode-numeric-character-reference@^2.0.0:
   dependencies:
     micromark-util-symbol "^2.0.0"
 
-micromark-util-decode-string@^2.0.0:
+micromark-util-decode-string@2.0.1, micromark-util-decode-string@^2.0.0:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/micromark-util-decode-string/-/micromark-util-decode-string-2.0.1.tgz#6cb99582e5d271e84efca8e61a807994d7161eb2"
   integrity sha512-nDV/77Fj6eH1ynwscYTOsbK7rR//Uj0bZXBwJZRfaLEJ1iGBR6kIfNmlNqaqJf649EP0F3NWNdeJi03elllNUQ==
