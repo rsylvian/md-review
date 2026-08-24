@@ -92,26 +92,71 @@ describe('renderMarkdown', () => {
     expect(src.slice(code!.start, code!.end)).toBe(code!.text);
   });
 
-  it('marks spans approximate when escapes make offsets non-linear', () => {
+  it('segments escapes into their own approx token, exact elsewhere', () => {
     const src = 'Escapes: \\*not bold\\* here.\n';
     const spans = textSpans(renderMarkdown(src));
 
-    const span = spans.find((s) => s.text.includes('not bold'));
-    expect(span).toBeDefined();
-    expect(span!.text).toBe('Escapes: *not bold* here.');
-    // Can't map char-by-char, so the span covers the whole node and says so.
-    expect(span!.approx).toBe(true);
-    expect(src.slice(span!.start, span!.end)).toBe('Escapes: \\*not bold\\* here.');
+    // The escape tokens are isolated, atomic spans; everything else stays exact
+    // and individually addressable, instead of the whole sentence going approx.
+    expect(spans.map((s) => [s.text, s.approx])).toEqual([
+      ['Escapes: ', false],
+      ['*', true],
+      ['not bold', false],
+      ['*', true],
+      [' here.', false],
+    ]);
+    for (const span of spans.filter((s) => !s.approx)) {
+      expect(src.slice(span.start, span.end)).toBe(span.text);
+    }
+    const [openStar, closeStar] = spans.filter((s) => s.approx);
+    expect(src.slice(openStar!.start, openStar!.end)).toBe('\\*');
+    expect(src.slice(closeStar!.start, closeStar!.end)).toBe('\\*');
   });
 
-  it('marks spans approximate when entities make offsets non-linear', () => {
+  it('segments entities into their own approx token, exact elsewhere', () => {
     const src = 'Entities: &amp; and &copy; inline.\n';
     const spans = textSpans(renderMarkdown(src));
 
-    const span = spans.find((s) => s.text.includes('inline'));
-    expect(span).toBeDefined();
-    expect(span!.text).toBe('Entities: & and © inline.');
-    expect(span!.approx).toBe(true);
+    expect(spans.map((s) => [s.text, s.approx])).toEqual([
+      ['Entities: ', false],
+      ['&', true],
+      [' and ', false],
+      ['©', true],
+      [' inline.', false],
+    ]);
+    const [amp, copy] = spans.filter((s) => s.approx);
+    expect(src.slice(amp!.start, amp!.end)).toBe('&amp;');
+    expect(src.slice(copy!.start, copy!.end)).toBe('&copy;');
+  });
+
+  it('wraps genuine inline whitespace between adjacent runs with its own position', () => {
+    const src = '**bold** *italic* run.\n';
+    const spans = textSpans(renderMarkdown(src));
+
+    expect(spans.map((s) => s.text)).toEqual(['bold', ' ', 'italic', ' run.']);
+    for (const span of spans) {
+      expect(span.approx).toBe(false);
+      expect(src.slice(span.start, span.end)).toBe(span.text);
+    }
+  });
+
+  it('segments an escape adjacent to markup without going approx elsewhere', () => {
+    const src = '**bold** \\*escaped\\* and *italic*.\n';
+    const spans = textSpans(renderMarkdown(src));
+
+    expect(spans.map((s) => [s.text, s.approx])).toEqual([
+      ['bold', false],
+      [' ', false],
+      ['*', true],
+      ['escaped', false],
+      ['*', true],
+      [' and ', false],
+      ['italic', false],
+      ['.', false],
+    ]);
+    for (const span of spans.filter((s) => !s.approx)) {
+      expect(src.slice(span.start, span.end)).toBe(span.text);
+    }
   });
 
   it('does not wrap whitespace-only text between blocks', () => {

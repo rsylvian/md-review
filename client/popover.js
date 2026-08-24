@@ -34,7 +34,12 @@ function contains(rect, point) {
  * The passage a point lands in, or null.
  *
  * Where passages overlap — a commented word inside a commented sentence — the smaller one
- * wins, since it is the more specific thing to have aimed at.
+ * wins, since it is the more specific thing to have aimed at. Compared by each passage's
+ * whole footprint (every rect it has, not just the one under the pointer): two different
+ * passages can otherwise contribute a pixel-identical individual rect — e.g. a
+ * whole-sentence comment split into several spans around an escape, one of which exactly
+ * covers a separate, narrower comment's own single rect — and comparing only that one
+ * rect would leave the tie to whichever passage happened to be checked first.
  *
  * @param {readonly {id: string, rects: readonly Rect[]}[]} passages
  * @param {{x: number, y: number}} point
@@ -45,13 +50,11 @@ export function passageAtPoint(passages, point) {
   let bestArea = Infinity;
 
   for (const passage of passages) {
-    for (const rect of passage.rects) {
-      if (!contains(rect, point)) continue;
-      const size = area(rect);
-      if (size < bestArea) {
-        best = passage.id;
-        bestArea = size;
-      }
+    if (!passage.rects.some((rect) => contains(rect, point))) continue;
+    const size = passage.rects.reduce((sum, rect) => sum + area(rect), 0);
+    if (size < bestArea) {
+      best = passage.id;
+      bestArea = size;
     }
   }
 

@@ -33,6 +33,28 @@ describe('passageAtPoint', () => {
     expect(passageAtPoint(passages, { x: 50, y: 10 })).toBe('word');
   });
 
+  it('breaks a tie between pixel-identical rects by the whole passage footprint', () => {
+    // A whole-sentence comment split around an escape/entity token can contribute a
+    // rect that exactly matches a separate, narrower comment's own rect. Comparing
+    // only the clicked rect would tie and fall back to array order; comparing each
+    // passage's full footprint picks the genuinely more specific one.
+    const passages = [
+      {
+        id: 'sentence',
+        rects: [
+          rect(0, 0, 50, 20),
+          rect(50, 0, 60, 20),
+          rect(60, 0, 100, 20),
+          rect(100, 0, 110, 20),
+          rect(110, 0, 160, 20),
+        ],
+      },
+      { id: 'word', rects: [rect(60, 0, 100, 20)] },
+    ];
+
+    expect(passageAtPoint(passages, { x: 80, y: 10 })).toBe('word');
+  });
+
   it('hits a passage on any of the lines it wraps across', () => {
     const passages = [{ id: 'a', rects: [rect(200, 0, 400, 20), rect(0, 20, 150, 40)] }];
 

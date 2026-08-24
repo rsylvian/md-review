@@ -353,11 +353,27 @@ function App() {
 
   const startDraft = useCallback(() => {
     if (sent !== null) return;
+    // A draft holds text that isn't saved yet, so it stays until saved or cancelled —
+    // the same rule the click-dismiss handler below enforces for clicking elsewhere.
+    if (draft !== null) return;
     const anchor = anchorFromSelection(window.getSelection(), docRef.current);
     if (anchor === null) return;
     setDraft({ anchor, body: '', suggestion: null });
     setOpenId(null);
-  }, [sent]);
+  }, [sent, draft]);
+
+  /**
+   * A drag that ends outside the document — most commonly releasing over the sticky
+   * topbar while dragging upward past the visible top of the text — still extends the
+   * browser's own Selection correctly, but a mouseup bound only to #doc would never see
+   * it. Listening on document, like the click-dismiss handler below, catches it
+   * regardless of where the release lands; anchorFromSelection already rejects anything
+   * outside #doc, so this can't create a bogus draft from an unrelated selection.
+   */
+  useEffect(() => {
+    document.addEventListener('mouseup', startDraft);
+    return () => document.removeEventListener('mouseup', startDraft);
+  }, [startDraft]);
 
   /**
    * Opens the comment on the clicked passage, and closes the open one when a click lands
@@ -464,7 +480,6 @@ function App() {
         <article
           id="doc"
           ref=${docRef}
-          onMouseUp=${startDraft}
           onKeyUp=${startDraft}
           dangerouslySetInnerHTML=${{ __html: doc.html }}
         ></article>
