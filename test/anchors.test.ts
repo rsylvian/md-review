@@ -12,11 +12,7 @@ const DOC = [
 ].join('\n');
 
 /** A comment on `needle`'s first occurrence in `source`. */
-function commentOn(
-  source: string,
-  needle: string,
-  overrides: Partial<Comment> = {},
-): Comment {
+function commentOn(source: string, needle: string, overrides: Partial<Comment> = {}): Comment {
   const start = source.indexOf(needle);
   if (start === -1) throw new Error(`test setup: ${needle} not in source`);
   return {

@@ -35,7 +35,11 @@ function openBrowser(url: string): void {
   const command =
     process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
   try {
-    const child = spawn(command, [url], { stdio: 'ignore', detached: true, shell: process.platform === 'win32' });
+    const child = spawn(command, [url], {
+      stdio: 'ignore',
+      detached: true,
+      shell: process.platform === 'win32',
+    });
     child.on('error', () => note(`Could not open a browser. Visit ${url}`));
     child.unref();
   } catch {
@@ -45,7 +49,7 @@ function openBrowser(url: string): void {
 
 function readTarget(file: string): { absolute: string; source: string } {
   const absolute = resolve(process.cwd(), file);
-  let stats;
+  let stats: ReturnType<typeof statSync>;
   try {
     stats = statSync(absolute);
   } catch {

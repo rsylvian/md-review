@@ -87,7 +87,11 @@ describe('watchSystemTheme', () => {
         listeners.delete(fn),
     }));
     return {
-      fire: (matches: boolean) => listeners.forEach((fn) => fn({ matches })),
+      fire: (matches: boolean) => {
+        listeners.forEach((fn) => {
+          fn({ matches });
+        });
+      },
       count: () => listeners.size,
     };
   }

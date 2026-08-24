@@ -127,19 +127,23 @@ function CommentCard({ comment, onClose, onDelete }) {
       </button>
       <${Quote} text=${comment.anchor.quote} />
       ${comment.body.trim() === '' ? null : html`<p class="body">${comment.body}</p>`}
-      ${comment.suggestion === undefined
-        ? null
-        : html`
+      ${
+        comment.suggestion === undefined
+          ? null
+          : html`
             <div class="suggestion">
               <span class="tag">suggested rewrite</span>
               <pre>${comment.suggestion}</pre>
             </div>
-          `}
+          `
+      }
       <footer>
         <span class="lines">
-          ${comment.anchor.startLine === comment.anchor.endLine
-            ? `line ${comment.anchor.startLine}`
-            : `lines ${comment.anchor.startLine}–${comment.anchor.endLine}`}
+          ${
+            comment.anchor.startLine === comment.anchor.endLine
+              ? `line ${comment.anchor.startLine}`
+              : `lines ${comment.anchor.startLine}–${comment.anchor.endLine}`
+          }
         </span>
         <button class="link danger" onClick=${onDelete} title="Delete this comment">delete</button>
       </footer>
@@ -203,8 +207,9 @@ function DraftCard({ draft, source, onChange, onSave, onCancel, saving }) {
         onKeyDown=${onKeyDown}
       ></textarea>
 
-      ${suggesting
-        ? html`
+      ${
+        suggesting
+          ? html`
             <label class="suggest-field">
               <span class="tag">replace with</span>
               <textarea
@@ -215,7 +220,8 @@ function DraftCard({ draft, source, onChange, onSave, onCancel, saving }) {
               ></textarea>
             </label>
           `
-        : null}
+          : null
+      }
 
       <footer>
         <button
@@ -260,9 +266,11 @@ function Sent({ count }) {
     <div class="sent">
       <h1>Review sent</h1>
       <p>
-        ${count === 0
-          ? 'No comments — the agent will hear that the draft reads fine.'
-          : `${count === 1 ? '1 comment' : `${count} comments`} handed back to the agent.`}
+        ${
+          count === 0
+            ? 'No comments — the agent will hear that the draft reads fine.'
+            : `${count === 1 ? '1 comment' : `${count} comments`} handed back to the agent.`
+        }
       </p>
       <p class="muted">You can close this tab.</p>
     </div>
@@ -287,7 +295,9 @@ function App() {
   const popoverRef = useRef(null);
 
   useEffect(() => {
-    fetchDoc().then(setDoc).catch((e) => setError(e.message));
+    fetchDoc()
+      .then(setDoc)
+      .catch((e) => setError(e.message));
     // Existence of this stream is how the server knows the tab is still open.
     const stream = openLiveness();
     return () => stream.close();
@@ -459,18 +469,18 @@ function App() {
           dangerouslySetInnerHTML=${{ __html: doc.html }}
         ></article>
 
-        ${shown === null
-          ? null
-          : html`
+        ${
+          shown === null
+            ? null
+            : html`
               <div
                 class="popover"
                 ref=${popoverRef}
-                style=${pos === null
-                  ? 'visibility:hidden'
-                  : `top:${pos.top}px;left:${pos.left}px`}
+                style=${pos === null ? 'visibility:hidden' : `top:${pos.top}px;left:${pos.left}px`}
               >
-                ${draft !== null
-                  ? html`
+                ${
+                  draft !== null
+                    ? html`
                       <${DraftCard}
                         draft=${draft}
                         source=${doc.source}
@@ -480,15 +490,17 @@ function App() {
                         onCancel=${() => setDraft(null)}
                       />
                     `
-                  : html`
+                    : html`
                       <${CommentCard}
                         comment=${shown}
                         onClose=${() => setOpenId(null)}
                         onDelete=${() => remove(shown.id)}
                       />
-                    `}
+                    `
+                }
               </div>
-            `}
+            `
+        }
       </div>
     </main>
 

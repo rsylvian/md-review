@@ -21,6 +21,8 @@ jobs:
 
       - run: yarn typecheck
 
+      - run: yarn lint
+
       - run: yarn test:coverage
 
       # The runner has no Google Chrome, so use Playwright's own chromium.

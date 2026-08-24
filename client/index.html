@@ -11,14 +11,14 @@
        * blocking, which a module import cannot be. Keep the two in step.
        */
       try {
-        var stored = localStorage.getItem('md-review:theme');
+        const stored = localStorage.getItem('md-review:theme');
         document.documentElement.dataset.theme =
           stored === 'light' || stored === 'dark'
             ? stored
             : matchMedia('(prefers-color-scheme: dark)').matches
               ? 'dark'
               : 'light';
-      } catch (e) {
+      } catch {
         document.documentElement.dataset.theme = 'light';
       }
     </script>

@@ -17,6 +17,7 @@ yarn install
 yarn build          # tsc -> dist/, then chmod +x dist/cli.js
 yarn dev            # tsc --watch
 yarn typecheck       # tsc --noEmit (src) + tsc -p tsconfig.test.json (src+test+client)
+yarn lint            # biome check . (formatting + lint); yarn lint:fix to apply fixes
 yarn test            # vitest: unit + server integration tests, under test/
 yarn test:coverage   # same, plus a v8 coverage report; CI runs this and enforces the thresholds in vitest.config.ts
 yarn test:watch
@@ -51,3 +52,4 @@ yarn test:e2e        # builds first, then runs Playwright specs in test/e2e agai
 - One review server = one document, one sidecar file. There is no multi-document or multi-session concept to preserve.
 - The sidecar (`~/.cache/md-review/`) is the source of truth for comment state across rounds. It lives outside the reviewed project on purpose — nothing to gitignore, and review state survives being run from any cwd. `dist/` is gitignored, consistent with a `git clone` + `yarn install` + `npm link` workflow rather than a published npm package (`private: true` in package.json, with a `//private` comment noting that's intentional for now).
 - `skill/SKILL.md` documents the *agent-facing* contract (how an agent should invoke `md-review`, read its report, and iterate). Prefer keeping that document and the actual CLI/report behavior in sync over updating one without the other.
+- Lint/format is Biome (`biome.json`), CI-enforced via `yarn lint`. `noNonNullAssertion` is deliberately off — the codebase (especially tests) relies on `!` together with `noUncheckedIndexedAccess` in `tsconfig.json`, and the two are meant to be used together. `client/style.css` is excluded from Biome entirely: its formatter rewrites `16px/1.65` (a font-size/line-height shorthand) into `16px / 1.65`, which risks changing how it parses, so hand-formatting stays in force there.
