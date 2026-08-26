@@ -35,6 +35,8 @@
 
   --doc-width: 40rem;
   --panel-width: 22rem;
+  /* Tallest topbar control (the theme button) plus its vertical padding and border. */
+  --topbar-height: calc(1.85rem + 1.4rem + 1px);
   /* The panel docks beside the document, so both share the centred column. */
   --content-width: calc(var(--doc-width) + var(--panel-width));
 
@@ -111,6 +113,7 @@ body {
   top: 0;
   z-index: 10;
   display: flex;
+  min-height: var(--topbar-height);
   gap: 1rem;
   align-items: center;
   padding: 0.7rem var(--gutter);
@@ -119,14 +122,20 @@ body {
   backdrop-filter: blur(8px);
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 0.85rem;
+  line-height: 1;
 }
 
 .topbar .file {
+  min-width: 0;
+  overflow: hidden;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar .count {
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .topbar-spacer {
@@ -750,6 +759,13 @@ main {
 
   .panel-toggle {
     display: inline-flex;
+    white-space: nowrap;
+  }
+
+  /* Keep the compact header to one line: the filename yields space first, so the
+   * fixed overlay can always begin directly below this known-height bar. */
+  .topbar {
+    gap: 0.5rem;
   }
 
   /* No docked panel to line up with here — back to a plain inline box, flush against
@@ -762,7 +778,7 @@ main {
 
   .panel {
     position: fixed;
-    top: 49px;
+    top: var(--topbar-height);
     right: 0;
     bottom: 0;
     width: min(var(--panel-width), 100vw);

@@ -191,4 +191,22 @@ test.describe('layout', () => {
     // slide in — its left edge sits at or past the viewport's right edge.
     expect(panelBox === null || panelBox.x >= viewportWidth).toBe(true);
   });
+
+  test('the mobile panel starts below a long, truncated filename header', async ({ page }) => {
+    session = await startReview();
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto(session.url);
+    await page.locator('#doc [data-pos]').first().waitFor();
+
+    await page.locator('.topbar .file').evaluate((element) => {
+      element.textContent = 'a deliberately long filename that must not wrap the review header.md';
+    });
+    await page.locator('.panel-toggle').click();
+
+    const header = await page.locator('.topbar').boundingBox();
+    const panel = await page.locator('.panel').boundingBox();
+    if (header === null || panel === null) throw new Error('expected header and panel');
+
+    expect(panel.y).toBeCloseTo(header.y + header.height, 1);
+  });
 });
