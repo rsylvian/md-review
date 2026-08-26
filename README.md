@@ -9,7 +9,16 @@ Review markdown in your browser, hand the comments back to the agent.
 
 Needs **Node 26 or newer**.
 
-**Clone:**
+**Recommended:**
+```
+npx @rsylvian/md-review draft.md
+```
+or install globally:
+```
+npm i -g @rsylvian/md-review
+```
+
+**From source:**
 ```
 git clone https://github.com/rsylvian/md-review.git
 cd md-review
@@ -18,12 +27,7 @@ npm link
 md-review --install-skill   # optional, Claude Code only
 ```
 
-**Or install globally without cloning:**
-```
-npm i -g git+https://github.com/rsylvian/md-review.git
-```
-
-To upgrade: `git pull && yarn install`.
+To upgrade a source install: `git pull && yarn install`.
 
 ## The loop
 
@@ -70,6 +74,15 @@ first" is enough.
 - **The document is read once.** Editing the file while a review is open won't update the page.
 - **Raw HTML in markdown is dropped** rather than rendered.
 - Comments live in `~/.cache/md-review/`.
+
+## Preview builds
+
+Adding the `preview` label to a PR publishes a one-off build under the `pr-<number>`
+dist-tag (republished on every new push while the label is attached):
+
+```
+npx @rsylvian/md-review@pr-<number>
+```
 
 ## Development
 
