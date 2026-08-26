@@ -1,23 +1,10 @@
-import {
-  html,
-  render,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "./vendor/htm-preact.js";
-import { anchorFromSelection } from "./selection.js";
-import { anchorRects, paintHighlights } from "./highlight.js";
-import { passageAtPoint } from "./popover.js";
-import {
-  createComment,
-  deleteComment,
-  fetchDoc,
-  finalize,
-  openLiveness,
-} from "./api.js";
-import { currentTheme, setTheme, watchSystemTheme } from "./theme.js";
-import { formatRelativeTime } from "./relative-time.js";
+import { html, render, useCallback, useEffect, useRef, useState } from './vendor/htm-preact.js';
+import { anchorFromSelection } from './selection.js';
+import { anchorRects, paintHighlights } from './highlight.js';
+import { passageAtPoint } from './popover.js';
+import { createComment, deleteComment, fetchDoc, finalize, openLiveness } from './api.js';
+import { currentTheme, setTheme, watchSystemTheme } from './theme.js';
+import { formatRelativeTime } from './relative-time.js';
 
 const byPosition = (a, b) => a.anchor.startOffset - b.anchor.startOffset;
 
@@ -84,7 +71,7 @@ function ThemeToggle() {
   // Follow the OS for as long as no choice has been stored.
   useEffect(() => watchSystemTheme(setLocal), []);
 
-  const next = theme === "dark" ? "light" : "dark";
+  const next = theme === 'dark' ? 'light' : 'dark';
   const flip = () => {
     setTheme(next);
     setLocal(next);
@@ -97,7 +84,7 @@ function ThemeToggle() {
       title=${`Switch to ${next} theme`}
       aria-label=${`Switch to ${next} theme`}
     >
-      ${theme === "dark" ? html`<${SunIcon} />` : html`<${MoonIcon} />`}
+      ${theme === 'dark' ? html`<${SunIcon} />` : html`<${MoonIcon} />`}
     </button>
   `;
 }
@@ -124,7 +111,7 @@ function Header({ file, openCount, updatedAt, panelOpen, onTogglePanel }) {
 }
 
 function Quote({ text, max = 90 }) {
-  const oneLine = text.replace(/\s+/g, " ").trim();
+  const oneLine = text.replace(/\s+/g, ' ').trim();
   const clipped = oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
   return html`<q class="quote">${clipped}</q>`;
 }
@@ -145,9 +132,8 @@ function sourceSlice(source, anchor) {
  * @returns {string | undefined}
  */
 function effectiveSuggestion(draft) {
-  if (draft.deleting) return "";
-  if (draft.suggestion === null || draft.suggestion.trim() === "")
-    return undefined;
+  if (draft.deleting) return '';
+  if (draft.suggestion === null || draft.suggestion.trim() === '') return undefined;
   return draft.suggestion;
 }
 
@@ -160,26 +146,22 @@ function offsetToLine(source, offset) {
   const clamped = Math.max(0, Math.min(offset, source.length));
   let line = 1;
   for (let i = 0; i < clamped; i++) {
-    if (source[i] === "\n") line++;
+    if (source[i] === '\n') line++;
   }
-  if (clamped === source.length && source.endsWith("\n")) line--;
+  if (clamped === source.length && source.endsWith('\n')) line--;
   return Math.max(1, line);
 }
 
 function lineLabel(source, anchor) {
-  const startLine =
-    anchor.startLine ?? offsetToLine(source, anchor.startOffset);
+  const startLine = anchor.startLine ?? offsetToLine(source, anchor.startOffset);
   const endLine =
-    anchor.endLine ??
-    offsetToLine(source, Math.max(anchor.startOffset, anchor.endOffset - 1));
-  return startLine === endLine
-    ? `line ${startLine}`
-    : `lines ${startLine}–${endLine}`;
+    anchor.endLine ?? offsetToLine(source, Math.max(anchor.startOffset, anchor.endOffset - 1));
+  return startLine === endLine ? `line ${startLine}` : `lines ${startLine}–${endLine}`;
 }
 
 /** A one-line, length-clipped quote for the Rewrite placeholder. */
 function clipOneLine(text, max = 60) {
-  const oneLine = text.replace(/\s+/g, " ").trim();
+  const oneLine = text.replace(/\s+/g, ' ').trim();
   return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
 }
 
@@ -193,27 +175,23 @@ function Composer({ draft, source, onChange, onSave, onCancel, saving }) {
   const original = sourceSlice(source, draft.anchor);
   const rewrite = effectiveSuggestion(draft);
   const canSave =
-    draft.deleting ||
-    draft.body.trim() !== "" ||
-    (rewrite !== undefined && rewrite.trim() !== "");
+    draft.deleting || draft.body.trim() !== '' || (rewrite !== undefined && rewrite.trim() !== '');
 
   const onKeyDown = (event) => {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       if (canSave) onSave();
     }
-    if (event.key === "Escape") {
+    if (event.key === 'Escape') {
       event.preventDefault();
       onCancel();
     }
   };
 
-  const value = suggesting ? (draft.suggestion ?? "") : draft.body;
+  const value = suggesting ? (draft.suggestion ?? '') : draft.body;
   const onInput = (e) =>
     onChange(
-      suggesting
-        ? { ...draft, suggestion: e.target.value }
-        : { ...draft, body: e.target.value },
+      suggesting ? { ...draft, suggestion: e.target.value } : { ...draft, body: e.target.value },
     );
 
   return html`
@@ -221,49 +199,50 @@ function Composer({ draft, source, onChange, onSave, onCancel, saving }) {
       <div class="segmented">
         <button
           type="button"
-          class=${!draft.deleting && !suggesting ? "active" : ""}
-          onClick=${() =>
-            onChange({ ...draft, deleting: false, suggestion: null })}
+          class=${!draft.deleting && !suggesting ? 'active' : ''}
+          onClick=${() => onChange({ ...draft, deleting: false, suggestion: null })}
         >
           Note
         </button>
         <button
           type="button"
-          class=${suggesting ? "active" : ""}
+          class=${suggesting ? 'active' : ''}
           onClick=${() =>
             onChange({
               ...draft,
               deleting: false,
-              suggestion: draft.suggestion ?? "",
+              suggestion: draft.suggestion ?? '',
             })}
         >
           Rewrite
         </button>
         <button
           type="button"
-          class=${draft.deleting ? "active" : ""}
+          class=${draft.deleting ? 'active' : ''}
           onClick=${() => onChange({ ...draft, deleting: true })}
         >
           Delete
         </button>
       </div>
 
-      ${draft.deleting
-        ? html`<p class="composer-delete-note">
+      ${
+        draft.deleting
+          ? html`<p class="composer-delete-note">
             The highlighted passage will be marked for deletion.
           </p>`
-        : html`
+          : html`
             <textarea
               ref=${textarea}
               rows="3"
-              aria-label=${suggesting ? "Replacement text" : "Comment"}
-              placeholder=${suggesting
-                ? `Replace "${clipOneLine(original)}" with…`
-                : "What should change?"}
+              aria-label=${suggesting ? 'Replacement text' : 'Comment'}
+              placeholder=${
+                suggesting ? `Replace "${clipOneLine(original)}" with…` : 'What should change?'
+              }
               value=${value}
               onInput=${onInput}
             ></textarea>
-          `}
+          `
+      }
 
       <footer class="composer-footer">
         <span class="spacer"></span>
@@ -273,7 +252,7 @@ function Composer({ draft, source, onChange, onSave, onCancel, saving }) {
           onClick=${onSave}
           disabled=${!canSave || saving}
         >
-          ${draft.deleting ? "delete" : "comment"}
+          ${draft.deleting ? 'delete' : 'comment'}
           <span class="shortcut" aria-hidden="true">⌘↵</span>
         </button>
       </footer>
@@ -285,16 +264,18 @@ function CommentRow({ comment, active, onActivate, onDelete }) {
   return html`
     <article
       data-id=${comment.id}
-      class=${`comment-row${active ? " active" : ""}`}
+      class=${`comment-row${active ? ' active' : ''}`}
       onClick=${onActivate}
     >
       <div class="head">
-        <span class="lines muted">${lineLabel("", comment.anchor)}</span>
-        ${comment.suggestion === undefined
-          ? null
-          : comment.suggestion === ""
-            ? html`<span class="pill pill-delete">deletion</span>`
-            : html`<span class="pill">rewrite</span>`}
+        <span class="lines muted">${lineLabel('', comment.anchor)}</span>
+        ${
+          comment.suggestion === undefined
+            ? null
+            : comment.suggestion === ''
+              ? html`<span class="pill pill-delete">deletion</span>`
+              : html`<span class="pill">rewrite</span>`
+        }
         <span class="spacer"></span>
         <button
           class="icon-button danger"
@@ -308,12 +289,12 @@ function CommentRow({ comment, active, onActivate, onDelete }) {
           <${TrashIcon} />
         </button>
       </div>
-      ${comment.body.trim() === ""
-        ? null
-        : html`<p class="body">${comment.body}</p>`}
-      ${comment.suggestion === undefined || comment.suggestion === ""
-        ? null
-        : html`<pre class="row-suggestion">${comment.suggestion}</pre>`}
+      ${comment.body.trim() === '' ? null : html`<p class="body">${comment.body}</p>`}
+      ${
+        comment.suggestion === undefined || comment.suggestion === ''
+          ? null
+          : html`<pre class="row-suggestion">${comment.suggestion}</pre>`
+      }
     </article>
   `;
 }
@@ -324,7 +305,7 @@ function PanelHeader({ count, onSend, sending }) {
       <span class="title">Comments</span>
       <span class="muted">${count}</span>
       <button class="send" onClick=${onSend} disabled=${sending || count === 0}>
-        ${sending ? "Sending…" : "Send"}
+        ${sending ? 'Sending…' : 'Send'}
       </button>
     </div>
   `;
@@ -348,15 +329,16 @@ function Panel({
   onDelete,
 }) {
   return html`
-    <aside class="panel" ref=${panelRef} data-open=${isOpen ? "true" : "false"}>
+    <aside class="panel" ref=${panelRef} data-open=${isOpen ? 'true' : 'false'}>
       <${PanelHeader}
         count=${open.length}
         onSend=${onSend}
         sending=${sending}
       />
       <div class="panel-list" ref=${panelListRef}>
-        ${draft !== null
-          ? html`
+        ${
+          draft !== null
+            ? html`
               <${Composer}
                 draft=${draft}
                 source=${source}
@@ -366,7 +348,8 @@ function Panel({
                 onCancel=${onCancel}
               />
             `
-          : null}
+            : null
+        }
         ${open.map(
           (comment) => html`
             <${CommentRow}
@@ -378,13 +361,15 @@ function Panel({
             />
           `,
         )}
-        ${draft === null && open.length === 0
-          ? html`
+        ${
+          draft === null && open.length === 0
+            ? html`
               <p class="panel-empty">
                 Highlight a sentence in the document to get started.
               </p>
             `
-          : null}
+            : null
+        }
       </div>
     </aside>
   `;
@@ -400,9 +385,7 @@ function ResolvedStrip({ resolved }) {
           (comment) => html`
             <li key=${comment.id}>
               <${Quote} text=${comment.anchor.quote} />
-              ${comment.body.trim() === ""
-                ? null
-                : html`<span class="body">${comment.body}</span>`}
+              ${comment.body.trim() === '' ? null : html`<span class="body">${comment.body}</span>`}
             </li>
           `,
         )}
@@ -416,9 +399,11 @@ function Sent({ count, report }) {
     <div class="sent">
       <h1>Review sent</h1>
       <p>
-        ${count === 0
-          ? "No comments — the agent will hear that the draft reads fine."
-          : `${count === 1 ? "1 comment" : `${count} comments`} handed back to the agent.`}
+        ${
+          count === 0
+            ? 'No comments — the agent will hear that the draft reads fine.'
+            : `${count === 1 ? '1 comment' : `${count} comments`} handed back to the agent.`
+        }
       </p>
       <p class="muted">You can close this tab.</p>
       <pre class="report-preview">${report}</pre>
@@ -432,12 +417,10 @@ function scrollPassageIntoView(scroller, docRoot, anchor) {
   if (rects.length === 0) return;
   const passageTop = Math.min(...rects.map((r) => r.top));
   const docRootOffset =
-    docRoot.getBoundingClientRect().top -
-    scroller.getBoundingClientRect().top +
-    scroller.scrollTop;
+    docRoot.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
   scroller.scrollTo({
     top: Math.max(0, docRootOffset + passageTop - 140),
-    behavior: "smooth",
+    behavior: 'smooth',
   });
 }
 
@@ -480,8 +463,7 @@ function App() {
   const open = doc === null ? [] : [...doc.open].sort(byPosition);
 
   /** The one passage highlighted as active: a draft being composed, or the open row. */
-  const shown =
-    draft !== null ? draft : (open.find((c) => c.id === openId) ?? null);
+  const shown = draft !== null ? draft : (open.find((c) => c.id === openId) ?? null);
 
   useEffect(() => {
     const root = docRef.current;
@@ -493,13 +475,13 @@ function App() {
 
   useEffect(() => {
     const onKey = (event) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== 'Escape') return;
       if (draft !== null) setDraft(null);
       else if (panelOpen) setPanelOpen(false);
       else setOpenId(null);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [draft, panelOpen]);
 
   const startDraft = useCallback(() => {
@@ -509,7 +491,7 @@ function App() {
     if (draft !== null) return;
     const anchor = anchorFromSelection(window.getSelection(), docRef.current);
     if (anchor === null) return;
-    setDraft({ anchor, body: "", suggestion: null, deleting: false });
+    setDraft({ anchor, body: '', suggestion: null, deleting: false });
     setOpenId(null);
     // Below the docked breakpoint the panel is a peer that must be revealed explicitly;
     // the CSS media query ignores this attribute once the panel is docked.
@@ -525,8 +507,8 @@ function App() {
    * outside #doc, so this can't create a bogus draft from an unrelated selection.
    */
   useEffect(() => {
-    document.addEventListener("mouseup", startDraft);
-    return () => document.removeEventListener("mouseup", startDraft);
+    document.addEventListener('mouseup', startDraft);
+    return () => document.removeEventListener('mouseup', startDraft);
   }, [startDraft]);
 
   /**
@@ -565,8 +547,8 @@ function App() {
       if (hit !== null) setPanelOpen(true);
     };
 
-    document.addEventListener("click", onClick);
-    return () => document.removeEventListener("click", onClick);
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
   }, [doc, draft, sent, open]);
 
   // When a passage click activates a row, bring that row into view within the panel.
@@ -574,27 +556,19 @@ function App() {
     if (openId === null) return;
     panelListRef.current
       ?.querySelector(`[data-id="${openId}"]`)
-      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [openId]);
 
   const activate = (id) => {
     setOpenId(id);
     const comment = open.find((c) => c.id === id);
-    if (
-      comment !== undefined &&
-      docScrollerRef.current !== null &&
-      docRef.current !== null
-    ) {
-      scrollPassageIntoView(
-        docScrollerRef.current,
-        docRef.current,
-        comment.anchor,
-      );
+    if (comment !== undefined && docScrollerRef.current !== null && docRef.current !== null) {
+      scrollPassageIntoView(docScrollerRef.current, docRef.current, comment.anchor);
     }
   };
 
   const save = async () => {
-    setPending("comment");
+    setPending('comment');
     try {
       const created = await createComment(
         {
@@ -631,7 +605,7 @@ function App() {
   };
 
   const send = async () => {
-    setPending("review");
+    setPending('review');
     try {
       const result = await finalize();
       setSent({ count: open.length, report: result.report });
@@ -648,8 +622,7 @@ function App() {
     </div>`;
   }
   if (doc === null) return html`<div class="loading">Loading…</div>`;
-  if (sent !== null)
-    return html`<${Sent} count=${sent.count} report=${sent.report} />`;
+  if (sent !== null) return html`<${Sent} count=${sent.count} report=${sent.report} />`;
 
   return html`
     <${Header}
@@ -660,9 +633,11 @@ function App() {
       onTogglePanel=${() => setPanelOpen((v) => !v)}
     />
 
-    ${error === null
-      ? null
-      : html`<div class="error" onClick=${() => setError(null)}>${error}</div>`}
+    ${
+      error === null
+        ? null
+        : html`<div class="error" onClick=${() => setError(null)}>${error}</div>`
+    }
 
     <main>
       <div class="doc-scroller" ref=${docScrollerRef}>
@@ -684,12 +659,12 @@ function App() {
         isOpen=${panelOpen}
         panelRef=${panelRef}
         panelListRef=${panelListRef}
-        saving=${pending === "comment"}
+        saving=${pending === 'comment'}
         onChange=${setDraft}
         onSave=${save}
         onCancel=${() => setDraft(null)}
         onSend=${send}
-        sending=${pending === "review"}
+        sending=${pending === 'review'}
         onActivate=${activate}
         onDelete=${remove}
       />
@@ -699,4 +674,4 @@ function App() {
   `;
 }
 
-render(html`<${App} />`, document.getElementById("root"));
+render(html`<${App} />`, document.getElementById('root'));
