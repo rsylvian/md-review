@@ -33,10 +33,10 @@
   --danger: #c9372c;
   --shadow: 0 1px 1px rgb(9 30 66 / 12%), 0 2px 8px rgb(9 30 66 / 8%);
 
-  --doc-width: 48rem;
-  --card-width: 21rem;
-  /* Comments open as popovers over the text, so the document column is all there is. */
-  --content-width: var(--doc-width);
+  --doc-width: 40rem;
+  --panel-width: 22rem;
+  /* The panel docks beside the document, so both share the centred column. */
+  --content-width: calc(var(--doc-width) + var(--panel-width));
 
   /*
    * The gutter that lines the header up with the content beneath it. Everything that
@@ -77,15 +77,30 @@
   box-sizing: border-box;
 }
 
+/* App shell: the page itself no longer scrolls — the document and the panel each
+   scroll independently inside it. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   font:
-    16px/1.65 ui-serif,
+    17px/1.72 ui-serif,
     Georgia,
     'Iowan Old Style',
     serif;
+  letter-spacing: 0.002em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -111,43 +126,61 @@ body {
 }
 
 .topbar .count {
-  position: relative;
   color: var(--muted);
-  cursor: default;
 }
 
-/* Usage hint, parked behind a hover on the comment count. */
-.hint {
-  position: absolute;
-  top: calc(100% + 0.55rem);
-  left: 0;
-  z-index: 20;
-  width: max-content;
-  max-width: 17rem;
-  padding: 0.5rem 0.65rem;
+.topbar-spacer {
+  flex: 1;
+}
+
+/* Reveals the panel below the docked breakpoint; hidden entirely above it. */
+.panel-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+  background: none;
   color: var(--muted);
   font-size: 0.8rem;
-  line-height: 1.5;
-  opacity: 0;
-  visibility: hidden;
   transition:
-    opacity 0.1s ease-out,
-    visibility 0.1s ease-out;
+    background-color 0.1s ease-out,
+    color 0.1s ease-out;
 }
 
-.topbar .count:hover .hint,
-.topbar .count:focus-visible .hint {
-  opacity: 1;
-  visibility: visible;
+.panel-toggle:hover {
+  background: var(--subtle-bg);
+  color: var(--text);
 }
 
-/* First of the right-hand controls, so it takes the slack. */
-.topbar .icon-button {
-  margin-left: auto;
+/*
+ * The theme toggle is the only thing left in the topbar's right-hand cluster once Send
+ * lives in the panel header instead — flush against the topbar's own gutter it would
+ * float in dead space above the document, not above anything in particular. Positioned
+ * against `.topbar` itself (the nearest positioned ancestor, via its `position: sticky`)
+ * rather than with a negative margin computed from `--gutter`: `--gutter`'s `%` term
+ * resolves against whatever element it's used on, and a child's containing-block width
+ * is `.topbar`'s content box (excluding its own padding), not `.topbar`'s own box — so
+ * the same custom property silently means a different pixel value in each place.
+ * `right: 0` here needs no such calc: it's flush against `.topbar`'s padding edge by
+ * definition, which is the viewport's right edge, exactly matching the panel docked
+ * beneath it. Below the breakpoint the panel isn't docked, so this reverts to a plain
+ * inline box (see the narrow-screens media query).
+ */
+.topbar-panel-align {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--panel-width);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  /* Matches `.panel-header`'s own right padding, so this lines up with the Send button
+   * docked at the panel header's right edge instead of floating mid-width above it. */
+  padding-right: 16px;
 }
 
 .icon-button {
@@ -169,6 +202,10 @@ body {
 .icon-button:hover {
   background: var(--subtle-bg);
   color: var(--text);
+}
+
+.icon-button.danger:hover {
+  color: var(--danger);
 }
 
 .muted {
@@ -250,18 +287,24 @@ button {
   cursor: pointer;
 }
 
-/* ---------- the document ---------- */
+/* ---------- layout: document scroller + panel ---------- */
 
 main {
-  display: grid;
-  grid-template-columns: minmax(0, var(--doc-width));
-  justify-content: center;
-  padding: 2.5rem var(--gutter) 8rem;
+  display: flex;
+  flex: 1;
+  min-height: 0;
 }
 
-/* Positioning context for the popover, with the same box as the document. */
+.doc-scroller {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 34px 28px 120px;
+}
+
 .column {
-  position: relative;
+  margin: 0 auto;
+  width: min(100%, var(--doc-width));
   min-width: 0;
 }
 
@@ -269,7 +312,43 @@ main {
   min-width: 0;
 }
 
-/* Rendered markdown */
+.panel {
+  width: var(--panel-width);
+  flex: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.panel-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+
+.panel-header .title {
+  font-weight: 600;
+}
+
+.panel-header .send {
+  margin-left: auto;
+}
+
+.panel-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 12px;
+}
+
+/* ---------- reading surface (rendered markdown) ---------- */
 
 #doc > :first-child {
   margin-top: 0;
@@ -285,16 +364,28 @@ main {
 }
 
 #doc h1 {
-  font-size: 1.85rem;
+  font-size: 1.95em;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  line-height: 1.15;
 }
+
 #doc h2 {
-  font-size: 1.4rem;
+  font-size: 1.3em;
+  letter-spacing: -0.006em;
+  line-height: 1.25;
+  margin-top: 2.2rem;
 }
+
 #doc h3 {
   font-size: 1.15rem;
 }
 
-#doc p,
+#doc p {
+  margin: 0 0 1.15rem;
+  text-wrap: pretty;
+}
+
 #doc ul,
 #doc ol,
 #doc blockquote,
@@ -314,11 +405,11 @@ main {
 }
 
 #doc code {
-  padding: 0.1em 0.35em;
+  padding: 0.1em 0.36em;
   border-radius: 3px;
-  background: var(--code-bg);
+  background: var(--subtle-bg);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.87em;
+  font-size: 0.85em;
 }
 
 #doc pre {
@@ -411,111 +502,201 @@ main {
   border-bottom-right-radius: 0;
 }
 
-/* ---------- comment cards ---------- */
-
-/*
- * A comment hangs below the passage it belongs to, over the text. Placed by popover.js:
- * `top`/`left` arrive as inline styles, and stay hidden until they do.
- */
-.popover {
-  position: absolute;
-  z-index: 5;
-  width: var(--card-width);
-  max-width: 100%;
-}
-
-.card {
-  position: relative;
-  padding: 0.7rem 0.85rem;
-  padding-right: 2.1rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--surface);
-  box-shadow: var(--shadow), 0 0 0 1px var(--accent);
-  border-color: var(--accent);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.83rem;
-}
-
-.card-close {
-  position: absolute;
-  top: 0.3rem;
-  right: 0.3rem;
-  width: 1.5rem;
-  height: 1.5rem;
-}
+/* ---------- quotes & line labels (shared) ---------- */
 
 .quote {
   display: block;
-  margin-bottom: 0.4rem;
   color: var(--muted);
   font-style: italic;
   quotes: '”' '”';
 }
 
-.card .body {
-  margin: 0 0 0.5rem;
-  white-space: pre-wrap;
+.lines {
+  font-variant-numeric: tabular-nums;
 }
 
-.card textarea {
+/* ---------- composer ---------- */
+
+.composer {
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 5px;
+  background: var(--subtle-bg);
+  margin-bottom: 0.6rem;
+}
+
+.segmented button {
+  flex: 1;
+  padding: 0.3rem 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  transition:
+    background-color 0.1s ease-out,
+    color 0.1s ease-out;
+}
+
+.segmented button.active {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.composer textarea {
   width: 100%;
-  padding: 0.4rem 0.5rem;
+  padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--bg);
   color: var(--text);
-  font: inherit;
+  font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
   resize: vertical;
 }
 
-.card textarea:focus-visible {
+.composer textarea:focus-visible {
   border-color: var(--accent);
   outline: 1px solid var(--accent);
   outline-offset: -2px;
 }
 
-.tag {
-  display: block;
-  margin: 0.5rem 0 0.25rem;
-  color: var(--accent);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.suggestion pre,
-.suggest-field {
+.composer-delete-note {
   margin: 0;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
-.suggestion pre {
-  overflow-x: auto;
-  padding: 0.45rem 0.55rem;
-  border-left: 3px solid var(--accent);
-  border-radius: 0 3px 3px 0;
-  background: var(--accent-soft);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.78rem;
-  white-space: pre-wrap;
-}
-
-.card footer {
+.composer-footer {
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  margin-top: 0.55rem;
+  margin-top: 0.65rem;
   color: var(--muted);
-  font-size: 0.73rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
 }
 
-.card footer .spacer {
+.composer-footer .spacer {
   margin-left: auto;
 }
 
-.lines {
-  font-variant-numeric: tabular-nums;
+.primary .shortcut {
+  margin-left: 0.3rem;
+  opacity: 0.75;
+}
+
+/* ---------- comment rows ---------- */
+
+.comment-row {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition:
+    background-color 0.1s ease-out,
+    border-color 0.1s ease-out;
+}
+
+.comment-row.active {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.comment-row .head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.comment-row .head .icon-button {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: -0.2rem 0;
+}
+
+.pill {
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.pill-delete {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+
+.comment-row .head .spacer {
+  margin-left: auto;
+}
+
+.comment-row .quote {
+  margin-bottom: 0.35rem;
+  font-size: 12.5px;
+}
+
+.comment-row .body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.row-suggestion {
+  margin-top: 6px;
+  padding: 0.4rem 0.5rem;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 3px 3px 0;
+  background: var(--accent-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.panel-empty {
+  margin: 18px 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/* ---------- sent screen ---------- */
+
+.report-preview {
+  margin-top: 1.25rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  max-height: 340px;
+  overflow: auto;
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
 }
 
 /* ---------- resolved strip ---------- */
@@ -563,7 +744,35 @@ main {
 /* ---------- narrow screens ---------- */
 
 @media (max-width: 60rem) {
-  main {
-    grid-template-columns: minmax(0, 1fr);
+  :root {
+    --content-width: var(--doc-width);
+  }
+
+  .panel-toggle {
+    display: inline-flex;
+  }
+
+  /* No docked panel to line up with here — back to a plain inline box, flush against
+   * the topbar's own gutter rather than the docked panel's padding. */
+  .topbar-panel-align {
+    position: static;
+    width: auto;
+    padding-right: 0;
+  }
+
+  .panel {
+    position: fixed;
+    top: 49px;
+    right: 0;
+    bottom: 0;
+    width: min(var(--panel-width), 100vw);
+    z-index: 15;
+    box-shadow: var(--shadow);
+    transform: translateX(100%);
+    transition: transform 0.1s ease-out;
+  }
+
+  .panel[data-open='true'] {
+    transform: translateX(0);
   }
 }

@@ -47,7 +47,7 @@ function openBrowser(url: string): void {
   }
 }
 
-function readTarget(file: string): { absolute: string; source: string } {
+function readTarget(file: string): { absolute: string; source: string; modifiedAt: string } {
   const absolute = resolve(process.cwd(), file);
   let stats: ReturnType<typeof statSync>;
   try {
@@ -56,16 +56,21 @@ function readTarget(file: string): { absolute: string; source: string } {
     throw new Error(`no such file: ${file}`);
   }
   if (!stats.isFile()) throw new Error(`not a file: ${file}`);
-  return { absolute, source: readFileSync(absolute, 'utf8') };
+  return {
+    absolute,
+    source: readFileSync(absolute, 'utf8'),
+    modifiedAt: stats.mtime.toISOString(),
+  };
 }
 
 async function review(file: string, options: Options): Promise<void> {
-  const { source } = readTarget(file);
+  const { source, modifiedAt } = readTarget(file);
   const sidecarPath = sidecarPathFor(file);
 
   const server = await startReviewServer({
     filePath: file,
     source,
+    sourceModifiedAt: modifiedAt,
     sidecarPath,
     clientDir: join(PACKAGE_ROOT, 'client'),
     vendorFile: resolveClientRuntime(),

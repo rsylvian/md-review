@@ -73,6 +73,26 @@ describe('formatReport', () => {
     expect(report).toMatch(/With:\n```\nTrack p95 latency weekly\.\n```/);
   });
 
+  it('renders an explicit empty suggestion as a deletion, not a rewrite', () => {
+    const report = formatReport({
+      filePath: 'draft.md',
+      open: [
+        makeComment(DOC, 'We should probably measure this.', {
+          body: '',
+          suggestion: '',
+        }),
+      ],
+      newlyResolved: [],
+      generatedAt: AT,
+    });
+
+    expect(report).toContain('suggested deletion');
+    expect(report).not.toContain('suggested rewrite');
+    expect(report).toMatch(/Delete:\n```\nWe should probably measure this\.\n```/);
+    expect(report).not.toContain('Replace:');
+    expect(report).not.toContain('With:');
+  });
+
   it('lengthens the fence when the content contains backticks', () => {
     const src = 'Use ```js blocks``` for code.\n';
     const report = formatReport({

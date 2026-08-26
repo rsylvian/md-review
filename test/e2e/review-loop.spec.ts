@@ -163,11 +163,11 @@ async function dragBoundary(page: Page, fromWord: string, toWord: string): Promi
 
 /** Saves a draft comment with the given body, the way `selectWord`/`doubleClickWord` set up. */
 async function saveComment(page: Page, body: string): Promise<void> {
-  const draft = page.locator('.card.draft');
-  await expect(draft).toBeVisible();
-  await draft.locator('textarea').first().fill(body);
-  await draft.getByRole('button', { name: 'comment' }).click();
-  await expect(page.locator('.card:not(.draft)')).toHaveCount(1);
+  const composer = page.locator('.composer');
+  await expect(composer).toBeVisible();
+  await composer.locator('textarea').first().fill(body);
+  await composer.getByRole('button', { name: 'comment', exact: true }).click();
+  await expect(page.locator('.comment-row')).toHaveCount(1);
 }
 
 /** The text actually highlighted for the saved comment, read back from the live DOM. */
@@ -193,22 +193,19 @@ test.describe('review loop', () => {
     await page.goto(session.url);
 
     await expect(page.locator('#doc h1')).toHaveText('Q3 Platform Plan');
-    await expect(page.locator('.hint')).toBeHidden();
-    await page.locator('.topbar .count').hover();
-    await expect(page.locator('.hint')).toBeVisible();
 
     await selectWord(page, 'consectetur');
 
-    const draft = page.locator('.card.draft');
-    await expect(draft).toBeVisible();
-    await draft.locator('textarea').first().fill('Too vague — name the actual users.');
-    await draft.getByRole('button', { name: 'comment' }).click();
+    const composer = page.locator('.composer');
+    await expect(composer).toBeVisible();
+    await composer.locator('textarea').first().fill('Too vague — name the actual users.');
+    await composer.getByRole('button', { name: 'comment', exact: true }).click();
 
-    // The saved card replaces the draft.
-    const card = page.locator('.card:not(.draft)');
-    await expect(card).toHaveCount(1);
-    await expect(card).toContainText('Too vague');
-    await expect(page.locator('.topbar .count')).toContainText('1 comment');
+    // The saved row appears in the panel.
+    const row = page.locator('.comment-row');
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('Too vague');
+    await expect(page.locator('.panel-toggle')).toContainText('Comments (1)');
 
     // The reviewer closes the tab; the CLI should finish on its own.
     await page.close();
@@ -220,22 +217,36 @@ test.describe('review loop', () => {
     expect(stdout).toContain('> consectetur');
   });
 
+  test('the Send button is disabled until there is at least one comment', async ({ page }) => {
+    session = await startReview();
+    await page.goto(session.url);
+
+    const send = page.locator('.panel-header .send');
+    await expect(send).toBeDisabled();
+
+    await selectWord(page, 'consectetur');
+    const composer = page.locator('.composer');
+    await composer.locator('textarea').first().fill('Name them.');
+    await composer.getByRole('button', { name: 'comment', exact: true }).click();
+
+    await expect(page.locator('.comment-row')).toHaveCount(1);
+    await expect(send).toBeEnabled();
+  });
+
   test('a suggested rewrite arrives as exact replacement text', async ({ page }) => {
     session = await startReview();
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    const draft = page.locator('.card.draft');
-    await draft.locator('textarea').first().fill('Name them.');
-    await draft.getByRole('button', { name: 'suggest a rewrite' }).click();
+    const composer = page.locator('.composer');
+    await composer.getByRole('button', { name: 'Rewrite' }).click();
 
-    const suggestion = draft.locator('textarea').nth(1);
-    // Prefilled with the exact source text, ready to edit.
-    await expect(suggestion).toHaveValue('consectetur');
-    await suggestion.fill('data engineers');
-    await draft.getByRole('button', { name: 'comment' }).click();
+    const field = composer.locator('textarea');
+    await expect(field).toHaveAttribute('placeholder', 'Replace "consectetur" with…');
+    await field.fill('data engineers');
+    await composer.getByRole('button', { name: 'comment', exact: true }).click();
 
-    await expect(page.locator('.card .suggestion')).toContainText('data engineers');
+    await expect(page.locator('.comment-row .row-suggestion')).toContainText('data engineers');
 
     await page.close();
     const { stdout } = await session.output;
@@ -244,20 +255,22 @@ test.describe('review loop', () => {
     expect(stdout).toMatch(/With:\n```\ndata engineers\n```/);
   });
 
-  test('an untouched prefill is not reported as a rewrite', async ({ page }) => {
+  test('switching to Rewrite and back without writing a replacement leaves a plain comment', async ({
+    page,
+  }) => {
     session = await startReview();
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    const draft = page.locator('.card.draft');
-    await draft.locator('textarea').first().fill('Name them.');
-    // Opened the suggestion field, then left the prefill alone and said it in the body.
-    await draft.getByRole('button', { name: 'suggest a rewrite' }).click();
-    await expect(draft.locator('textarea').nth(1)).toHaveValue('consectetur');
-    await draft.getByRole('button', { name: 'comment' }).click();
+    const composer = page.locator('.composer');
+    // Peek at Rewrite mode, then change their mind and leave a note instead.
+    await composer.getByRole('button', { name: 'Rewrite' }).click();
+    await composer.getByRole('button', { name: 'Note' }).click();
+    await composer.locator('textarea').fill('Name them.');
+    await composer.getByRole('button', { name: 'comment', exact: true }).click();
 
-    await expect(page.locator('.card:not(.draft)')).toHaveCount(1);
-    await expect(page.locator('.card .suggestion')).toHaveCount(0);
+    await expect(page.locator('.comment-row')).toHaveCount(1);
+    await expect(page.locator('.comment-row .row-suggestion')).toHaveCount(0);
 
     await page.close();
     const { stdout } = await session.output;
@@ -266,19 +279,45 @@ test.describe('review loop', () => {
     expect(stdout).not.toContain('Replace:');
   });
 
-  test('an untouched prefill alone is not enough to save', async ({ page }) => {
+  test('an empty rewrite alone is not enough to save', async ({ page }) => {
     session = await startReview();
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    const draft = page.locator('.card.draft');
-    await draft.getByRole('button', { name: 'suggest a rewrite' }).click();
+    const composer = page.locator('.composer');
+    await composer.getByRole('button', { name: 'Rewrite' }).click();
 
-    // No body, and a suggestion identical to the source — there is no instruction here.
-    await expect(draft.getByRole('button', { name: 'comment' })).toBeDisabled();
+    // No replacement text yet — there is no instruction here.
+    await expect(composer.getByRole('button', { name: 'comment', exact: true })).toBeDisabled();
 
-    await draft.locator('textarea').nth(1).fill('data engineers');
-    await expect(draft.getByRole('button', { name: 'comment' })).toBeEnabled();
+    await composer.locator('textarea').fill('data engineers');
+    await expect(composer.getByRole('button', { name: 'comment', exact: true })).toBeEnabled();
+  });
+
+  test('Delete needs no text and marks the passage for removal', async ({ page }) => {
+    session = await startReview();
+    await page.goto(session.url);
+
+    await selectWord(page, 'consectetur');
+    const composer = page.locator('.composer');
+    await composer.getByRole('button', { name: 'Delete', exact: true }).click();
+
+    // No textarea in Delete mode — there is nothing to type.
+    await expect(composer.locator('textarea')).toHaveCount(0);
+    const saveButton = composer.getByRole('button', { name: 'delete', exact: true });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+
+    const row = page.locator('.comment-row');
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('.pill-delete')).toHaveText('deletion');
+
+    await page.close();
+    const { stdout } = await session.output;
+    expect(stdout).toContain('suggested deletion');
+    expect(stdout).toMatch(/Delete:\n```\nconsectetur\n```/);
+    expect(stdout).not.toContain('Replace:');
+    expect(stdout).not.toContain('With:');
   });
 
   test('saving a comment does not make the Send button claim to be sending', async ({ page }) => {
@@ -294,21 +333,21 @@ test.describe('review loop', () => {
     });
 
     await selectWord(page, 'consectetur');
-    await page.locator('.card.draft textarea').first().fill('saving now');
-    await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
+    await page.locator('.composer textarea').first().fill('saving now');
+    await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
 
-    // The draft's own button reports the save, which is the point of the flag.
+    // The composer's own button reports the save, which is the point of the flag.
     await expect(
-      page.locator('.card.draft').getByRole('button', { name: 'comment' }),
+      page.locator('.composer').getByRole('button', { name: 'comment', exact: true }),
     ).toBeDisabled();
 
-    // The review, meanwhile, is not being sent.
-    const send = page.locator('.topbar .send');
+    // The review, meanwhile, is not being sent — it just has no comments yet.
+    const send = page.locator('.panel-header .send');
     await expect(send).toHaveText('Send');
-    await expect(send).toBeEnabled();
 
     release();
-    await expect(page.locator('.card:not(.draft)')).toContainText('saving now');
+    await expect(page.locator('.comment-row')).toContainText('saving now');
+    await expect(send).toBeEnabled();
   });
 
   test('the Send button ends the review without closing the tab', async ({ page }) => {
@@ -316,13 +355,14 @@ test.describe('review loop', () => {
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    const draft = page.locator('.card.draft');
-    await draft.locator('textarea').first().fill('Sent via the button.');
-    await draft.getByRole('button', { name: 'comment' }).click();
+    const composer = page.locator('.composer');
+    await composer.locator('textarea').first().fill('Sent via the button.');
+    await composer.getByRole('button', { name: 'comment', exact: true }).click();
 
-    await page.locator('.topbar .send').click();
+    await page.locator('.panel-header .send').click();
 
     await expect(page.locator('.sent h1')).toHaveText('Review sent');
+    await expect(page.locator('.report-preview')).toContainText('Sent via the button.');
 
     const { stdout, code } = await session.output;
     expect(code).toBe(0);
@@ -334,9 +374,9 @@ test.describe('review loop', () => {
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    await page.locator('.card.draft textarea').first().fill('x');
-    await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
-    await expect(page.locator('.card:not(.draft)')).toHaveCount(1);
+    await page.locator('.composer textarea').first().fill('x');
+    await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+    await expect(page.locator('.comment-row')).toHaveCount(1);
 
     const highlighted = await page.evaluate(() => {
       const highlight = CSS.highlights.get('md-review-comment');
@@ -350,60 +390,64 @@ test.describe('review loop', () => {
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    const draft = page.locator('.card.draft');
-    await expect(draft).toBeVisible();
-    await draft.locator('textarea').first().fill('unsaved thoughts');
+    const composer = page.locator('.composer');
+    await expect(composer).toBeVisible();
+    await composer.locator('textarea').first().fill('unsaved thoughts');
 
     // Selecting a different passage without saving or cancelling first must not
     // silently discard the draft already in progress.
     await selectWord(page, 'Goals');
 
-    await expect(draft).toBeVisible();
-    await expect(draft.locator('textarea').first()).toHaveValue('unsaved thoughts');
+    await expect(composer).toBeVisible();
+    await expect(composer.locator('textarea').first()).toHaveValue('unsaved thoughts');
   });
 
-  test('a saved comment stays out of the way until its passage is clicked', async ({ page }) => {
+  test('clicking a passage activates its row; clicking elsewhere deactivates it without hiding the panel', async ({
+    page,
+  }) => {
     session = await startReview();
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    await page.locator('.card.draft textarea').first().fill('open me');
-    await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
-    await expect(page.locator('.card:not(.draft)')).toContainText('open me');
+    await page.locator('.composer textarea').first().fill('open me');
+    await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+    const row = page.locator('.comment-row');
+    await expect(row).toContainText('open me');
+    await expect(row).toHaveClass(/active/);
 
-    // Clicking off the passage puts it away.
+    // Clicking off the passage deactivates the row, but it stays in the panel.
     await clickWord(page, 'Goals');
-    await expect(page.locator('.popover')).toHaveCount(0);
+    await expect(row).not.toHaveClass(/active/);
+    await expect(row).toBeVisible();
 
     await clickWord(page, 'consectetur');
-    await expect(page.locator('.card:not(.draft)')).toContainText('open me');
-
-    // And the close button puts it away too.
-    await page.locator('.card').getByRole('button', { name: 'Close' }).click();
-    await expect(page.locator('.popover')).toHaveCount(0);
+    await expect(row).toHaveClass(/active/);
   });
 
-  test('clicking the empty space past the end of the document closes the card', async ({
-    page,
-  }) => {
+  test('clicking empty space below the document clears the active row', async ({ page }) => {
     session = await startReview();
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    await page.locator('.card.draft textarea').first().fill('close me');
-    await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
-    await expect(page.locator('.popover')).toHaveCount(1);
+    await page.locator('.composer textarea').first().fill('close me');
+    await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+    const row = page.locator('.comment-row');
+    await expect(row).toHaveCount(1);
+    await expect(row).toHaveClass(/active/);
 
     // Well below the last line, where there is no document left to click on.
     const doc = await page.locator('#doc').boundingBox();
     if (doc === null) throw new Error('no document');
     await page.mouse.click(doc.x + 40, doc.y + doc.height + 250);
 
-    await expect(page.locator('.popover')).toHaveCount(0);
+    await expect(row).not.toHaveClass(/active/);
+    await expect(row).toBeVisible();
   });
 
-  test('opening one comment closes the one already open', async ({ page }) => {
+  test('clicking a different passage activates its row instead of the previous one', async ({
+    page,
+  }) => {
     session = await startReview();
     await page.goto(session.url);
 
@@ -412,37 +456,39 @@ test.describe('review loop', () => {
       ['Goals', 'second comment'],
     ]) {
       await selectWord(page, word!);
-      await page.locator('.card.draft textarea').first().fill(body!);
-      await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
-      await expect(page.locator('.card:not(.draft)')).toContainText(body!);
+      await page.locator('.composer textarea').first().fill(body!);
+      await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+      await expect(page.locator('.comment-row', { hasText: body! })).toHaveCount(1);
     }
 
     await clickWord(page, 'consectetur');
-    await expect(page.locator('.popover')).toHaveCount(1);
-    await expect(page.locator('.card')).toContainText('first comment');
+    await expect(page.locator('.comment-row.active')).toHaveCount(1);
+    await expect(page.locator('.comment-row.active')).toContainText('first comment');
 
     await clickWord(page, 'Goals');
-    await expect(page.locator('.popover')).toHaveCount(1);
-    await expect(page.locator('.card')).toContainText('second comment');
+    await expect(page.locator('.comment-row.active')).toHaveCount(1);
+    await expect(page.locator('.comment-row.active')).toContainText('second comment');
+
+    await expect(page.locator('.comment-row')).toHaveCount(2);
   });
 
-  test('the card opens below its passage, inside the column', async ({ page }) => {
+  test('the composer renders inside the panel and never overlaps the document', async ({
+    page,
+  }) => {
     session = await startReview();
     await page.setViewportSize({ width: 1100, height: 900 });
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    await page.locator('.card.draft textarea').first().fill('placed');
-    await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
 
-    const passage = await wordBox(page, 'consectetur');
-    const card = await page.locator('.popover').boundingBox();
-    const column = await page.locator('#doc').boundingBox();
-    if (card === null || column === null) throw new Error('nothing to measure');
+    const composer = page.locator('.panel .composer');
+    await expect(composer).toHaveCount(1);
 
-    expect(card.y).toBeGreaterThanOrEqual(passage.y + passage.height);
-    expect(card.x).toBeGreaterThanOrEqual(column.x - 1);
-    expect(card.x + card.width).toBeLessThanOrEqual(column.x + column.width + 1);
+    const composerBox = await composer.boundingBox();
+    const scrollerBox = await page.locator('.doc-scroller').boundingBox();
+    if (composerBox === null || scrollerBox === null) throw new Error('nothing to measure');
+
+    expect(composerBox.x).toBeGreaterThanOrEqual(scrollerBox.x + scrollerBox.width - 1);
   });
 
   test('the finished review is saved beside the sidecar, as markdown only', async ({ page }) => {
@@ -450,9 +496,9 @@ test.describe('review loop', () => {
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    await page.locator('.card.draft textarea').first().fill('saved to disk');
-    await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
-    await expect(page.locator('.card:not(.draft)')).toHaveCount(1);
+    await page.locator('.composer textarea').first().fill('saved to disk');
+    await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+    await expect(page.locator('.comment-row')).toHaveCount(1);
 
     await page.close();
     await session.output;
@@ -475,12 +521,12 @@ test.describe('review loop', () => {
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    await page.locator('.card.draft textarea').first().fill('never mind');
-    await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
-    await expect(page.locator('.card:not(.draft)')).toHaveCount(1);
+    await page.locator('.composer textarea').first().fill('never mind');
+    await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+    await expect(page.locator('.comment-row')).toHaveCount(1);
 
-    await page.locator('.card:not(.draft) button', { hasText: 'delete' }).click();
-    await expect(page.locator('.card:not(.draft)')).toHaveCount(0);
+    await page.locator('.comment-row').getByRole('button', { name: 'delete' }).click();
+    await expect(page.locator('.comment-row')).toHaveCount(0);
 
     await page.close();
     const { stdout } = await session.output;
@@ -492,15 +538,15 @@ test.describe('review loop', () => {
     await page.goto(session.url);
 
     await selectWord(page, 'consectetur');
-    await page.locator('.card.draft textarea').first().fill('survives a reload');
-    await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
-    await expect(page.locator('.card:not(.draft)')).toHaveCount(1);
+    await page.locator('.composer textarea').first().fill('survives a reload');
+    await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+    await expect(page.locator('.comment-row')).toHaveCount(1);
 
     await page.reload();
 
     // Still alive, and the comment came back from the server — reopen it to see.
     await clickWord(page, 'consectetur');
-    await expect(page.locator('.card:not(.draft)')).toContainText('survives a reload');
+    await expect(page.locator('.comment-row')).toContainText('survives a reload');
     expect(session.process.exitCode).toBeNull();
 
     await page.close();
@@ -514,9 +560,9 @@ test.describe('review loop', () => {
 
     // Round 1: comment on a passage.
     await selectWord(page, 'consectetur');
-    await page.locator('.card.draft textarea').first().fill('name them');
-    await page.locator('.card.draft').getByRole('button', { name: 'comment' }).click();
-    await expect(page.locator('.card:not(.draft)')).toHaveCount(1);
+    await page.locator('.composer textarea').first().fill('name them');
+    await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+    await expect(page.locator('.comment-row')).toHaveCount(1);
     await page.close();
     await session.output;
 
@@ -545,8 +591,7 @@ test.describe('review loop', () => {
       await next.goto(url);
 
       await expect(next.locator('.resolved summary')).toHaveText('Resolved (1)');
-      await expect(next.locator('.topbar .count')).toContainText('0 comments');
-      await expect(next.locator('.topbar .count')).toContainText('1 resolved');
+      await expect(next.locator('.panel-toggle')).toContainText('Comments (0)');
     } finally {
       second.kill('SIGKILL');
     }
@@ -634,7 +679,73 @@ test.describe('review loop', () => {
         .dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
     });
 
-    const draft = page.locator('.card.draft');
-    await expect(draft).toBeVisible();
+    const composer = page.locator('.composer');
+    await expect(composer).toBeVisible();
+  });
+
+  test('the sent screen shows the exact generated report', async ({ page }) => {
+    session = await startReview();
+    await page.goto(session.url);
+
+    await selectWord(page, 'consectetur');
+    await page.locator('.composer textarea').first().fill('Spot check the report body.');
+    await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+
+    await page.locator('.panel-header .send').click();
+    await expect(page.locator('.sent h1')).toHaveText('Review sent');
+
+    const preview = page.locator('.report-preview');
+    await expect(preview).toContainText('# Review of draft.md');
+    await expect(preview).toContainText('1 open comment');
+    await expect(preview).toContainText('Spot check the report body.');
+    await expect(preview).toContainText('> consectetur');
+  });
+
+  test('the Rewrite placeholder quotes a multi-word selection', async ({ page }) => {
+    session = await startReview();
+    await page.goto(session.url);
+
+    await dragBoundary(page, 'serves', 'users');
+    const composer = page.locator('.composer');
+    await composer.getByRole('button', { name: 'Rewrite' }).click();
+
+    await expect(composer.locator('textarea')).toHaveAttribute(
+      'placeholder',
+      'Replace "serves consectetur users" with…',
+    );
+  });
+
+  test('the composer textarea has an accessible label in both Note and Rewrite mode', async ({
+    page,
+  }) => {
+    session = await startReview();
+    await page.goto(session.url);
+
+    await selectWord(page, 'consectetur');
+    const composer = page.locator('.composer');
+    await expect(composer.getByLabel('Comment')).toBeVisible();
+
+    await composer.getByRole('button', { name: 'Rewrite' }).click();
+    await expect(composer.getByLabel('Replacement text')).toBeVisible();
+  });
+
+  test('the panel toggle opens and closes the panel below the breakpoint', async ({ page }) => {
+    session = await startReview();
+    await page.setViewportSize({ width: 720, height: 900 });
+    await page.goto(session.url);
+    await page.locator('#doc [data-pos]').first().waitFor();
+
+    const panel = page.locator('.panel');
+    await expect(panel).toHaveAttribute('data-open', 'false');
+
+    await page.locator('.panel-toggle').click();
+    await expect(panel).toHaveAttribute('data-open', 'true');
+
+    await page.locator('.panel-toggle').click();
+    await expect(panel).toHaveAttribute('data-open', 'false');
+
+    // Selecting text also reveals the panel, so the composer is reachable.
+    await selectWord(page, 'consectetur');
+    await expect(panel).toHaveAttribute('data-open', 'true');
   });
 });

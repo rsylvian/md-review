@@ -3,18 +3,21 @@ import {
   render,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
-} from './vendor/htm-preact.js';
-import { anchorFromSelection } from './selection.js';
-import { anchorRects, paintHighlights } from './highlight.js';
-import { passageAtPoint, placeCard, unionRect } from './popover.js';
-import { createComment, deleteComment, fetchDoc, finalize, openLiveness } from './api.js';
-import { currentTheme, setTheme, watchSystemTheme } from './theme.js';
-
-/** Space between a passage and the card hanging below it. */
-const GAP = 10;
+} from "./vendor/htm-preact.js";
+import { anchorFromSelection } from "./selection.js";
+import { anchorRects, paintHighlights } from "./highlight.js";
+import { passageAtPoint } from "./popover.js";
+import {
+  createComment,
+  deleteComment,
+  fetchDoc,
+  finalize,
+  openLiveness,
+} from "./api.js";
+import { currentTheme, setTheme, watchSystemTheme } from "./theme.js";
+import { formatRelativeTime } from "./relative-time.js";
 
 const byPosition = (a, b) => a.anchor.startOffset - b.anchor.startOffset;
 
@@ -52,6 +55,25 @@ const MoonIcon = () => html`
   </svg>
 `;
 
+const TrashIcon = () => html`
+  <svg
+    viewBox="0 0 16 16"
+    width="14"
+    height="14"
+    aria-hidden="true"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M3 4.5h10" />
+    <path d="M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5" />
+    <path d="M4.5 4.5l.6 8.4a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-8.4" />
+    <path d="M6.7 7v4M9.3 7v4" />
+  </svg>
+`;
+
 /**
  * Shows the theme you would switch *to*, which is the usual convention: a moon while
  * light, a sun while dark.
@@ -62,7 +84,7 @@ function ThemeToggle() {
   // Follow the OS for as long as no choice has been stored.
   useEffect(() => watchSystemTheme(setLocal), []);
 
-  const next = theme === 'dark' ? 'light' : 'dark';
+  const next = theme === "dark" ? "light" : "dark";
   const flip = () => {
     setTheme(next);
     setLocal(next);
@@ -75,85 +97,41 @@ function ThemeToggle() {
       title=${`Switch to ${next} theme`}
       aria-label=${`Switch to ${next} theme`}
     >
-      ${theme === 'dark' ? html`<${SunIcon} />` : html`<${MoonIcon} />`}
+      ${theme === "dark" ? html`<${SunIcon} />` : html`<${MoonIcon} />`}
     </button>
   `;
 }
 
-function Header({ file, openCount, resolvedCount, onSend, sending }) {
-  const label = openCount === 1 ? '1 comment' : `${openCount} comments`;
+function Header({ file, openCount, updatedAt, panelOpen, onTogglePanel }) {
   return html`
     <header class="topbar">
       <span class="file">${file}</span>
-      <span class="count" tabindex="0">
-        ${label}${resolvedCount > 0 ? html` · <span class="muted">${resolvedCount} resolved</span>` : null}
-        <span class="hint" role="tooltip">Highlight any text to comment on it. Close the tab when
-          you're done and the agent picks the comments up.</span>
-      </span>
-      <${ThemeToggle} />
-      <button class="send" onClick=${onSend} disabled=${sending}>
-        ${sending ? 'Sending…' : 'Send'}
+      <span class="count">Updated ${formatRelativeTime(updatedAt)}</span>
+      <span class="topbar-spacer"></span>
+      <button
+        class="panel-toggle"
+        onClick=${onTogglePanel}
+        aria-pressed=${panelOpen}
+        aria-label="Toggle the comments panel"
+      >
+        Comments (${openCount})
       </button>
+      <span class="topbar-panel-align">
+        <${ThemeToggle} />
+      </span>
     </header>
   `;
 }
 
-function Quote({ text }) {
-  const oneLine = text.replace(/\s+/g, ' ').trim();
-  const clipped = oneLine.length > 90 ? `${oneLine.slice(0, 90)}…` : oneLine;
+function Quote({ text, max = 90 }) {
+  const oneLine = text.replace(/\s+/g, " ").trim();
+  const clipped = oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
   return html`<q class="quote">${clipped}</q>`;
 }
 
-const CloseIcon = () => html`
-  <svg
-    viewBox="0 0 16 16"
-    width="13"
-    height="13"
-    aria-hidden="true"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="1.6"
-    stroke-linecap="round"
-  >
-    <path d="M4 4l8 8M12 4l-8 8" />
-  </svg>
-`;
-
-function CommentCard({ comment, onClose, onDelete }) {
-  return html`
-    <article class="card">
-      <button class="icon-button card-close" onClick=${onClose} title="Close" aria-label="Close">
-        <${CloseIcon} />
-      </button>
-      <${Quote} text=${comment.anchor.quote} />
-      ${comment.body.trim() === '' ? null : html`<p class="body">${comment.body}</p>`}
-      ${
-        comment.suggestion === undefined
-          ? null
-          : html`
-            <div class="suggestion">
-              <span class="tag">suggested rewrite</span>
-              <pre>${comment.suggestion}</pre>
-            </div>
-          `
-      }
-      <footer>
-        <span class="lines">
-          ${
-            comment.anchor.startLine === comment.anchor.endLine
-              ? `line ${comment.anchor.startLine}`
-              : `lines ${comment.anchor.startLine}–${comment.anchor.endLine}`
-          }
-        </span>
-        <button class="link danger" onClick=${onDelete} title="Delete this comment">delete</button>
-      </footer>
-    </article>
-  `;
-}
-
 /**
- * The document text a draft points at. The suggestion field is prefilled with this, so an
- * untouched prefill compares equal — and a suggestion equal to the source is not a rewrite.
+ * The document text a draft points at, quoted in the Rewrite placeholder so the reviewer
+ * knows what their replacement text is standing in for.
  * @returns {string}
  */
 function sourceSlice(source, anchor) {
@@ -161,84 +139,254 @@ function sourceSlice(source, anchor) {
 }
 
 /**
- * The suggestion worth sending, or undefined when there is none. An unedited prefill would
- * otherwise reach the report as `Replace: x / With: x` and mislabel the whole comment as a
- * rewrite, burying the real instruction in the body.
+ * The suggestion worth sending: an explicit empty string for a deletion (replace with
+ * nothing), the typed replacement for a rewrite, or undefined when there is none — an
+ * empty or whitespace-only rewrite field means the reviewer never actually wrote one.
  * @returns {string | undefined}
  */
-function effectiveSuggestion(draft, source) {
-  if (draft.suggestion === null) return undefined;
-  if (draft.suggestion === sourceSlice(source, draft.anchor)) return undefined;
+function effectiveSuggestion(draft) {
+  if (draft.deleting) return "";
+  if (draft.suggestion === null || draft.suggestion.trim() === "")
+    return undefined;
   return draft.suggestion;
 }
 
-function DraftCard({ draft, source, onChange, onSave, onCancel, saving }) {
+/**
+ * Mirrors src/anchors.ts's offsetToLine: a saved comment's anchor already carries
+ * startLine/endLine from the server, but a draft (built client-side from a raw
+ * Selection) only has offsets, so the composer needs to derive them itself.
+ */
+function offsetToLine(source, offset) {
+  const clamped = Math.max(0, Math.min(offset, source.length));
+  let line = 1;
+  for (let i = 0; i < clamped; i++) {
+    if (source[i] === "\n") line++;
+  }
+  if (clamped === source.length && source.endsWith("\n")) line--;
+  return Math.max(1, line);
+}
+
+function lineLabel(source, anchor) {
+  const startLine =
+    anchor.startLine ?? offsetToLine(source, anchor.startOffset);
+  const endLine =
+    anchor.endLine ??
+    offsetToLine(source, Math.max(anchor.startOffset, anchor.endOffset - 1));
+  return startLine === endLine
+    ? `line ${startLine}`
+    : `lines ${startLine}–${endLine}`;
+}
+
+/** A one-line, length-clipped quote for the Rewrite placeholder. */
+function clipOneLine(text, max = 60) {
+  const oneLine = text.replace(/\s+/g, " ").trim();
+  return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
+}
+
+function Composer({ draft, source, onChange, onSave, onCancel, saving }) {
   const textarea = useRef(null);
   useEffect(() => {
     textarea.current?.focus();
   }, []);
 
-  const suggesting = draft.suggestion !== null;
-  const rewrite = effectiveSuggestion(draft, source);
-  const canSave = draft.body.trim() !== '' || (rewrite !== undefined && rewrite.trim() !== '');
+  const suggesting = !draft.deleting && draft.suggestion !== null;
+  const original = sourceSlice(source, draft.anchor);
+  const rewrite = effectiveSuggestion(draft);
+  const canSave =
+    draft.deleting ||
+    draft.body.trim() !== "" ||
+    (rewrite !== undefined && rewrite.trim() !== "");
 
   const onKeyDown = (event) => {
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       if (canSave) onSave();
     }
-    if (event.key === 'Escape') {
+    if (event.key === "Escape") {
       event.preventDefault();
       onCancel();
     }
   };
 
+  const value = suggesting ? (draft.suggestion ?? "") : draft.body;
+  const onInput = (e) =>
+    onChange(
+      suggesting
+        ? { ...draft, suggestion: e.target.value }
+        : { ...draft, body: e.target.value },
+    );
+
   return html`
-    <article class="card draft">
-      <button class="icon-button card-close" onClick=${onCancel} title="Cancel" aria-label="Cancel">
-        <${CloseIcon} />
-      </button>
-      <textarea
-        ref=${textarea}
-        rows="3"
-        placeholder="What should change?"
-        value=${draft.body}
-        onInput=${(e) => onChange({ ...draft, body: e.target.value })}
-        onKeyDown=${onKeyDown}
-      ></textarea>
-
-      ${
-        suggesting
-          ? html`
-            <label class="suggest-field">
-              <span class="tag">replace with</span>
-              <textarea
-                rows="3"
-                value=${draft.suggestion}
-                onInput=${(e) => onChange({ ...draft, suggestion: e.target.value })}
-                onKeyDown=${onKeyDown}
-              ></textarea>
-            </label>
-          `
-          : null
-      }
-
-      <footer>
+    <article class="composer" onKeyDown=${onKeyDown}>
+      <div class="segmented">
         <button
-          class="link"
+          type="button"
+          class=${!draft.deleting && !suggesting ? "active" : ""}
+          onClick=${() =>
+            onChange({ ...draft, deleting: false, suggestion: null })}
+        >
+          Note
+        </button>
+        <button
+          type="button"
+          class=${suggesting ? "active" : ""}
           onClick=${() =>
             onChange({
               ...draft,
-              suggestion: suggesting ? null : sourceSlice(source, draft.anchor),
+              deleting: false,
+              suggestion: draft.suggestion ?? "",
             })}
         >
-          ${suggesting ? 'drop suggestion' : 'suggest a rewrite'}
+          Rewrite
         </button>
+        <button
+          type="button"
+          class=${draft.deleting ? "active" : ""}
+          onClick=${() => onChange({ ...draft, deleting: true })}
+        >
+          Delete
+        </button>
+      </div>
+
+      ${draft.deleting
+        ? html`<p class="composer-delete-note">
+            The highlighted passage will be marked for deletion.
+          </p>`
+        : html`
+            <textarea
+              ref=${textarea}
+              rows="3"
+              aria-label=${suggesting ? "Replacement text" : "Comment"}
+              placeholder=${suggesting
+                ? `Replace "${clipOneLine(original)}" with…`
+                : "What should change?"}
+              value=${value}
+              onInput=${onInput}
+            ></textarea>
+          `}
+
+      <footer class="composer-footer">
         <span class="spacer"></span>
         <button class="link" onClick=${onCancel}>cancel</button>
-        <button class="primary" onClick=${onSave} disabled=${!canSave || saving}>comment</button>
+        <button
+          class="primary"
+          onClick=${onSave}
+          disabled=${!canSave || saving}
+        >
+          ${draft.deleting ? "delete" : "comment"}
+          <span class="shortcut" aria-hidden="true">⌘↵</span>
+        </button>
       </footer>
     </article>
+  `;
+}
+
+function CommentRow({ comment, active, onActivate, onDelete }) {
+  return html`
+    <article
+      data-id=${comment.id}
+      class=${`comment-row${active ? " active" : ""}`}
+      onClick=${onActivate}
+    >
+      <div class="head">
+        <span class="lines muted">${lineLabel("", comment.anchor)}</span>
+        ${comment.suggestion === undefined
+          ? null
+          : comment.suggestion === ""
+            ? html`<span class="pill pill-delete">deletion</span>`
+            : html`<span class="pill">rewrite</span>`}
+        <span class="spacer"></span>
+        <button
+          class="icon-button danger"
+          title="Delete this comment"
+          aria-label="Delete this comment"
+          onClick=${(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <${TrashIcon} />
+        </button>
+      </div>
+      ${comment.body.trim() === ""
+        ? null
+        : html`<p class="body">${comment.body}</p>`}
+      ${comment.suggestion === undefined || comment.suggestion === ""
+        ? null
+        : html`<pre class="row-suggestion">${comment.suggestion}</pre>`}
+    </article>
+  `;
+}
+
+function PanelHeader({ count, onSend, sending }) {
+  return html`
+    <div class="panel-header">
+      <span class="title">Comments</span>
+      <span class="muted">${count}</span>
+      <button class="send" onClick=${onSend} disabled=${sending || count === 0}>
+        ${sending ? "Sending…" : "Send"}
+      </button>
+    </div>
+  `;
+}
+
+function Panel({
+  open,
+  draft,
+  source,
+  activeId,
+  isOpen,
+  panelRef,
+  panelListRef,
+  onChange,
+  onSave,
+  onCancel,
+  saving,
+  onSend,
+  sending,
+  onActivate,
+  onDelete,
+}) {
+  return html`
+    <aside class="panel" ref=${panelRef} data-open=${isOpen ? "true" : "false"}>
+      <${PanelHeader}
+        count=${open.length}
+        onSend=${onSend}
+        sending=${sending}
+      />
+      <div class="panel-list" ref=${panelListRef}>
+        ${draft !== null
+          ? html`
+              <${Composer}
+                draft=${draft}
+                source=${source}
+                saving=${saving}
+                onChange=${onChange}
+                onSave=${onSave}
+                onCancel=${onCancel}
+              />
+            `
+          : null}
+        ${open.map(
+          (comment) => html`
+            <${CommentRow}
+              key=${comment.id}
+              comment=${comment}
+              active=${comment.id === activeId}
+              onActivate=${() => onActivate(comment.id)}
+              onDelete=${() => onDelete(comment.id)}
+            />
+          `,
+        )}
+        ${draft === null && open.length === 0
+          ? html`
+              <p class="panel-empty">
+                Highlight a sentence in the document to get started.
+              </p>
+            `
+          : null}
+      </div>
+    </aside>
   `;
 }
 
@@ -252,7 +400,9 @@ function ResolvedStrip({ resolved }) {
           (comment) => html`
             <li key=${comment.id}>
               <${Quote} text=${comment.anchor.quote} />
-              ${comment.body.trim() === '' ? null : html`<span class="body">${comment.body}</span>`}
+              ${comment.body.trim() === ""
+                ? null
+                : html`<span class="body">${comment.body}</span>`}
             </li>
           `,
         )}
@@ -261,27 +411,41 @@ function ResolvedStrip({ resolved }) {
   `;
 }
 
-function Sent({ count }) {
+function Sent({ count, report }) {
   return html`
     <div class="sent">
       <h1>Review sent</h1>
       <p>
-        ${
-          count === 0
-            ? 'No comments — the agent will hear that the draft reads fine.'
-            : `${count === 1 ? '1 comment' : `${count} comments`} handed back to the agent.`
-        }
+        ${count === 0
+          ? "No comments — the agent will hear that the draft reads fine."
+          : `${count === 1 ? "1 comment" : `${count} comments`} handed back to the agent.`}
       </p>
       <p class="muted">You can close this tab.</p>
+      <pre class="report-preview">${report}</pre>
     </div>
   `;
+}
+
+/** Scrolls `scroller` so the passage sits 140px from the top of the visible area. */
+function scrollPassageIntoView(scroller, docRoot, anchor) {
+  const rects = anchorRects(docRoot, anchor);
+  if (rects.length === 0) return;
+  const passageTop = Math.min(...rects.map((r) => r.top));
+  const docRootOffset =
+    docRoot.getBoundingClientRect().top -
+    scroller.getBoundingClientRect().top +
+    scroller.scrollTop;
+  scroller.scrollTo({
+    top: Math.max(0, docRootOffset + passageTop - 140),
+    behavior: "smooth",
+  });
 }
 
 function App() {
   const [doc, setDoc] = useState(null);
   const [draft, setDraft] = useState(null);
   const [openId, setOpenId] = useState(null);
-  const [pos, setPos] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [sent, setSent] = useState(null);
   /**
    * Which request is in flight: 'comment' while one is being saved, 'review' while the
@@ -290,9 +454,14 @@ function App() {
    */
   const [pending, setPending] = useState(null);
   const [error, setError] = useState(null);
+  // Nothing reads this value directly — it just forces "Updated ... ago" to re-render
+  // as time passes, since formatRelativeTime's output isn't otherwise reactive.
+  const [, retick] = useState(0);
 
   const docRef = useRef(null);
-  const popoverRef = useRef(null);
+  const docScrollerRef = useRef(null);
+  const panelRef = useRef(null);
+  const panelListRef = useRef(null);
 
   useEffect(() => {
     fetchDoc()
@@ -303,53 +472,35 @@ function App() {
     return () => stream.close();
   }, []);
 
+  useEffect(() => {
+    const id = setInterval(() => retick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   const open = doc === null ? [] : [...doc.open].sort(byPosition);
 
-  /** The one card on screen: a draft being composed, or the comment whose popover is open. */
-  const shown = draft !== null ? draft : (open.find((c) => c.id === openId) ?? null);
-
-  /** Hang the card below its passage. Re-run whenever the passage may have moved. */
-  const reposition = useCallback(() => {
-    const root = docRef.current;
-    const card = popoverRef.current;
-    if (root === null || card === null || shown === null) {
-      setPos(null);
-      return;
-    }
-    const rects = anchorRects(root, shown.anchor);
-    if (rects.length === 0) {
-      setPos(null);
-      return;
-    }
-    setPos(placeCard(unionRect(rects), card.offsetWidth, root.clientWidth, GAP));
-  }, [doc, draft, openId]);
-
-  // A layout effect, so the card is placed before the browser paints it.
-  useLayoutEffect(reposition, [doc, draft, openId]);
-
-  useEffect(() => {
-    if (doc === null) return;
-    const onResize = () => reposition();
-    window.addEventListener('resize', onResize);
-    document.fonts?.ready.then(reposition);
-    return () => window.removeEventListener('resize', onResize);
-  }, [doc, draft, openId]);
+  /** The one passage highlighted as active: a draft being composed, or the open row. */
+  const shown =
+    draft !== null ? draft : (open.find((c) => c.id === openId) ?? null);
 
   useEffect(() => {
     const root = docRef.current;
     if (root === null || doc === null) return;
-    paintHighlights(root, open, shown?.anchor ?? null);
+    const repaint = () => paintHighlights(root, open, shown?.anchor ?? null);
+    repaint();
+    document.fonts?.ready.then(repaint);
   }, [doc, draft, openId]);
 
   useEffect(() => {
     const onKey = (event) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== "Escape") return;
       if (draft !== null) setDraft(null);
+      else if (panelOpen) setPanelOpen(false);
       else setOpenId(null);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [draft]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [draft, panelOpen]);
 
   const startDraft = useCallback(() => {
     if (sent !== null) return;
@@ -358,8 +509,11 @@ function App() {
     if (draft !== null) return;
     const anchor = anchorFromSelection(window.getSelection(), docRef.current);
     if (anchor === null) return;
-    setDraft({ anchor, body: '', suggestion: null });
+    setDraft({ anchor, body: "", suggestion: null, deleting: false });
     setOpenId(null);
+    // Below the docked breakpoint the panel is a peer that must be revealed explicitly;
+    // the CSS media query ignores this attribute once the panel is docked.
+    setPanelOpen(true);
   }, [sent, draft]);
 
   /**
@@ -371,25 +525,27 @@ function App() {
    * outside #doc, so this can't create a bogus draft from an unrelated selection.
    */
   useEffect(() => {
-    document.addEventListener('mouseup', startDraft);
-    return () => document.removeEventListener('mouseup', startDraft);
+    document.addEventListener("mouseup", startDraft);
+    return () => document.removeEventListener("mouseup", startDraft);
   }, [startDraft]);
 
   /**
    * Opens the comment on the clicked passage, and closes the open one when a click lands
    * anywhere else. Listening on the document rather than on the column is what makes the
-   * empty space past the end of the text dismiss the card.
+   * empty space past the end of the text dismiss the row.
    *
    * The highlights are painted ranges rather than elements, so there is nothing to click
-   * on directly — the passage has to be found by hit-testing.
+   * on directly — the passage has to be found by hit-testing. Clicks inside the panel
+   * manage openId through their own handlers (row activation, delete) — without this
+   * guard, every such click would also bubble here, hit-test against coordinates
+   * nowhere near any passage, and immediately clear openId again.
    */
   useEffect(() => {
     const onClick = (event) => {
       if (sent !== null) return;
       const root = docRef.current;
       if (root === null) return;
-      // Clicks inside the card are the card's own business.
-      if (popoverRef.current?.contains(event.target) === true) return;
+      if (panelRef.current?.contains(event.target) === true) return;
       // A drag that just selected text has already opened a draft for it.
       const selection = window.getSelection();
       if (selection !== null && !selection.isCollapsed) return;
@@ -401,20 +557,44 @@ function App() {
         id: comment.id,
         rects: anchorRects(root, comment.anchor),
       }));
-      setOpenId(
-        passageAtPoint(passages, {
-          x: event.clientX - origin.left,
-          y: event.clientY - origin.top,
-        }),
-      );
+      const hit = passageAtPoint(passages, {
+        x: event.clientX - origin.left,
+        y: event.clientY - origin.top,
+      });
+      setOpenId(hit);
+      if (hit !== null) setPanelOpen(true);
     };
 
-    document.addEventListener('click', onClick);
-    return () => document.removeEventListener('click', onClick);
-  }, [doc, draft, sent]);
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [doc, draft, sent, open]);
+
+  // When a passage click activates a row, bring that row into view within the panel.
+  useEffect(() => {
+    if (openId === null) return;
+    panelListRef.current
+      ?.querySelector(`[data-id="${openId}"]`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [openId]);
+
+  const activate = (id) => {
+    setOpenId(id);
+    const comment = open.find((c) => c.id === id);
+    if (
+      comment !== undefined &&
+      docScrollerRef.current !== null &&
+      docRef.current !== null
+    ) {
+      scrollPassageIntoView(
+        docScrollerRef.current,
+        docRef.current,
+        comment.anchor,
+      );
+    }
+  };
 
   const save = async () => {
-    setPending('comment');
+    setPending("comment");
     try {
       const created = await createComment(
         {
@@ -424,7 +604,7 @@ function App() {
           approx: draft.anchor.approx,
         },
         draft.body,
-        effectiveSuggestion(draft, doc.source),
+        effectiveSuggestion(draft),
       );
       setDoc((prev) => ({ ...prev, open: [...prev.open, created] }));
       setDraft(null);
@@ -441,17 +621,20 @@ function App() {
     try {
       await deleteComment(id);
       setOpenId(null);
-      setDoc((prev) => ({ ...prev, open: prev.open.filter((c) => c.id !== id) }));
+      setDoc((prev) => ({
+        ...prev,
+        open: prev.open.filter((c) => c.id !== id),
+      }));
     } catch (e) {
       setError(e.message);
     }
   };
 
   const send = async () => {
-    setPending('review');
+    setPending("review");
     try {
-      await finalize();
-      setSent(open.length);
+      const result = await finalize();
+      setSent({ count: open.length, report: result.report });
     } catch (e) {
       setError(e.message);
       setPending(null);
@@ -459,68 +642,61 @@ function App() {
   };
 
   if (error !== null && doc === null) {
-    return html`<div class="sent"><h1>Could not load the review</h1><p>${error}</p></div>`;
+    return html`<div class="sent">
+      <h1>Could not load the review</h1>
+      <p>${error}</p>
+    </div>`;
   }
   if (doc === null) return html`<div class="loading">Loading…</div>`;
-  if (sent !== null) return html`<${Sent} count=${sent} />`;
+  if (sent !== null)
+    return html`<${Sent} count=${sent.count} report=${sent.report} />`;
 
   return html`
     <${Header}
       file=${doc.file}
       openCount=${open.length}
-      resolvedCount=${doc.resolved.length}
-      onSend=${send}
-      sending=${pending === 'review'}
+      updatedAt=${doc.sourceModifiedAt}
+      panelOpen=${panelOpen}
+      onTogglePanel=${() => setPanelOpen((v) => !v)}
     />
 
-    ${error === null ? null : html`<div class="error" onClick=${() => setError(null)}>${error}</div>`}
+    ${error === null
+      ? null
+      : html`<div class="error" onClick=${() => setError(null)}>${error}</div>`}
 
     <main>
-      <div class="column">
-        <article
-          id="doc"
-          ref=${docRef}
-          onKeyUp=${startDraft}
-          dangerouslySetInnerHTML=${{ __html: doc.html }}
-        ></article>
-
-        ${
-          shown === null
-            ? null
-            : html`
-              <div
-                class="popover"
-                ref=${popoverRef}
-                style=${pos === null ? 'visibility:hidden' : `top:${pos.top}px;left:${pos.left}px`}
-              >
-                ${
-                  draft !== null
-                    ? html`
-                      <${DraftCard}
-                        draft=${draft}
-                        source=${doc.source}
-                        saving=${pending === 'comment'}
-                        onChange=${setDraft}
-                        onSave=${save}
-                        onCancel=${() => setDraft(null)}
-                      />
-                    `
-                    : html`
-                      <${CommentCard}
-                        comment=${shown}
-                        onClose=${() => setOpenId(null)}
-                        onDelete=${() => remove(shown.id)}
-                      />
-                    `
-                }
-              </div>
-            `
-        }
+      <div class="doc-scroller" ref=${docScrollerRef}>
+        <div class="column">
+          <article
+            id="doc"
+            ref=${docRef}
+            onKeyUp=${startDraft}
+            dangerouslySetInnerHTML=${{ __html: doc.html }}
+          ></article>
+        </div>
       </div>
+
+      <${Panel}
+        open=${open}
+        draft=${draft}
+        source=${doc.source}
+        activeId=${openId}
+        isOpen=${panelOpen}
+        panelRef=${panelRef}
+        panelListRef=${panelListRef}
+        saving=${pending === "comment"}
+        onChange=${setDraft}
+        onSave=${save}
+        onCancel=${() => setDraft(null)}
+        onSend=${send}
+        sending=${pending === "review"}
+        onActivate=${activate}
+        onDelete=${remove}
+      />
     </main>
 
     <${ResolvedStrip} resolved=${doc.resolved} />
   `;
 }
 
-render(html`<${App} />`, document.getElementById('root'));
+render(html`<${App} />`, document.getElementById("root"));

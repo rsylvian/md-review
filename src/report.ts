@@ -54,16 +54,23 @@ function quoteBlock(anchor: Anchor): string {
 
 function renderComment(comment: Comment, index: number): string {
   const { anchor } = comment;
-  const heading =
-    comment.suggestion === undefined
-      ? `## ${index + 1} — ${lineLabel(anchor)}`
-      : `## ${index + 1} — ${lineLabel(anchor)} · suggested rewrite`;
+  // An explicit empty-string suggestion is a deletion (replace the passage with
+  // nothing), distinct from no suggestion at all.
+  const deleting = comment.suggestion === '';
+  const rewriting = comment.suggestion !== undefined && !deleting;
+  const heading = deleting
+    ? `## ${index + 1} — ${lineLabel(anchor)} · suggested deletion`
+    : rewriting
+      ? `## ${index + 1} — ${lineLabel(anchor)} · suggested rewrite`
+      : `## ${index + 1} — ${lineLabel(anchor)}`;
 
   const parts = [heading, '', quoteBlock(anchor), ''];
 
   if (comment.body.trim() !== '') parts.push(comment.body.trim(), '');
 
-  if (comment.suggestion !== undefined) {
+  if (deleting) {
+    parts.push('Delete:', block(anchor.sourceText), '');
+  } else if (comment.suggestion !== undefined) {
     parts.push('Replace:', block(anchor.sourceText), '', 'With:', block(comment.suggestion), '');
   }
 

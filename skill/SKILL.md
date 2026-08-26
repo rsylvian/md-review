@@ -54,6 +54,8 @@ Track p95 latency weekly.
 
 - **`Replace:` / `With:` blocks are exact source text.** Apply them verbatim rather than
   paraphrasing — the reviewer wrote the replacement they want.
+- A `· suggested deletion` comment carries a `Delete:` block instead — exact source text
+  to remove outright, with no replacement.
 - A plain comment is a request to change the quoted passage. The line numbers refer to the
   file as it was when the review started.
 - **"No open comments"** means the draft reads fine. Say so and move on; do not invent

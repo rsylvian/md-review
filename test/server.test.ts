@@ -164,6 +164,15 @@ describe('review server', () => {
     expect(created.suggestion).toBe('Track p95 latency weekly.');
   });
 
+  it('accepts an explicit empty suggestion as a deletion, with no body required', async () => {
+    const { url } = await start();
+
+    const res = await postComment(url, 'the actual users', '', '');
+    expect(res.status).toBe(201);
+    const created = await res.json();
+    expect(created.suggestion).toBe('');
+  });
+
   it('rejects malformed comments', async () => {
     const { url } = await start();
 
