@@ -75,16 +75,23 @@ test.describe('layout', () => {
     expect(Math.abs(filename.left - doc.left)).toBeLessThan(1.5);
   });
 
-  test('the header controls line up with the right edge of the document', async ({ page }) => {
+  /**
+   * The theme toggle is the only thing left in the topbar's right-hand cluster (Send
+   * lives in the panel header now). It sits in a box exactly `--panel-width` wide,
+   * pulled flush to the viewport edge with a negative margin that cancels `--gutter` —
+   * so that box's horizontal span should match the docked panel's exactly.
+   */
+  test('the theme toggle lines up with the panel docked beneath it', async ({ page }) => {
     session = await startReview();
     await page.setViewportSize({ width: 1600, height: 900 });
     await page.goto(session.url);
     await page.locator('#doc [data-pos]').first().waitFor();
 
-    const send = await edges(page, '.topbar .send');
-    const doc = await edges(page, '#doc');
+    const align = await edges(page, '.topbar-panel-align');
+    const panel = await edges(page, '.panel');
 
-    expect(Math.abs(send.right - doc.right)).toBeLessThan(1.5);
+    expect(Math.abs(align.left - panel.left)).toBeLessThan(1.5);
+    expect(Math.abs(align.right - panel.right)).toBeLessThan(1.5);
   });
 
   test('the bar itself still spans the window', async ({ page }) => {
@@ -100,16 +107,25 @@ test.describe('layout', () => {
     expect(Math.abs(bar.right - width)).toBeLessThan(1);
   });
 
-  test('content is centred, with equal gutters either side', async ({ page }) => {
+  /**
+   * The panel is flush with the viewport's right edge, so the document no longer has a
+   * symmetric gutter within the *viewport* — it has one within the space left of the
+   * panel (the doc-scroller), which is what --content-width's algebra actually
+   * guarantees. The doc-scroller ends exactly where the panel begins (flex siblings,
+   * no gap), so that space is `panel.left`.
+   */
+  test('the document is centred in the space left of the panel, with equal gutters either side', async ({
+    page,
+  }) => {
     session = await startReview();
     await page.setViewportSize({ width: 1600, height: 900 });
     await page.goto(session.url);
     await page.locator('#doc [data-pos]').first().waitFor();
 
     const doc = await edges(page, '#doc');
-    const width = await page.evaluate(() => document.documentElement.clientWidth);
+    const panel = await edges(page, '.panel');
 
-    expect(Math.abs(doc.left - (width - doc.right))).toBeLessThan(1.5);
+    expect(Math.abs(doc.left - (panel.left - doc.right))).toBeLessThan(1.5);
   });
 
   test('stays aligned at an awkward width, and keeps a minimum gutter when cramped', async ({
@@ -141,5 +157,56 @@ test.describe('layout', () => {
 
     expect(doc.left).toBeGreaterThanOrEqual(23);
     expect(width - doc.right).toBeGreaterThanOrEqual(23);
+  });
+
+  test('the panel is exactly 352px wide and flush with the right edge of the viewport', async ({
+    page,
+  }) => {
+    session = await startReview();
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto(session.url);
+    await page.locator('#doc [data-pos]').first().waitFor();
+
+    const panel = await page.locator('.panel').boundingBox();
+    if (panel === null) throw new Error('no panel');
+    const width = await page.evaluate(() => document.documentElement.clientWidth);
+
+    expect(panel.width).toBeCloseTo(352, 0);
+    expect(width - (panel.x + panel.width)).toBeLessThan(1);
+  });
+
+  test('the panel is hidden by default below the breakpoint, with a toggle shown instead', async ({
+    page,
+  }) => {
+    session = await startReview();
+    await page.setViewportSize({ width: 720, height: 900 });
+    await page.goto(session.url);
+    await page.locator('#doc [data-pos]').first().waitFor();
+
+    await expect(page.locator('.panel-toggle')).toBeVisible();
+
+    const viewportWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    const panelBox = await page.locator('.panel').boundingBox();
+    // Translated fully off-screen to the right, not merely display:none, so it can
+    // slide in — its left edge sits at or past the viewport's right edge.
+    expect(panelBox === null || panelBox.x >= viewportWidth).toBe(true);
+  });
+
+  test('the mobile panel starts below a long, truncated filename header', async ({ page }) => {
+    session = await startReview();
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto(session.url);
+    await page.locator('#doc [data-pos]').first().waitFor();
+
+    await page.locator('.topbar .file').evaluate((element) => {
+      element.textContent = 'a deliberately long filename that must not wrap the review header.md';
+    });
+    await page.locator('.panel-toggle').click();
+
+    const header = await page.locator('.topbar').boundingBox();
+    const panel = await page.locator('.panel').boundingBox();
+    if (header === null || panel === null) throw new Error('expected header and panel');
+
+    expect(panel.y).toBeCloseTo(header.y + header.height, 1);
   });
 });

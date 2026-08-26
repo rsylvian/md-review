@@ -1,5 +1,5 @@
 /**
- * Popover geometry: which commented passage a click landed in, and where its card goes.
+ * Popover geometry: which commented passage a click landed in.
  *
  * Highlights are painted with the CSS Custom Highlight API, so there is no element per
  * passage to hang a click handler on — the passage under the pointer has to be found by
@@ -59,42 +59,4 @@ export function passageAtPoint(passages, point) {
   }
 
   return best;
-}
-
-/**
- * One box covering every line a passage wraps across, so the card can hang below the
- * whole thing rather than below whichever line happened to be clicked.
- *
- * @param {readonly Rect[]} rects
- * @returns {Rect}
- */
-export function unionRect(rects) {
-  return {
-    left: Math.min(...rects.map((r) => r.left)),
-    top: Math.min(...rects.map((r) => r.top)),
-    right: Math.max(...rects.map((r) => r.right)),
-    bottom: Math.max(...rects.map((r) => r.bottom)),
-  };
-}
-
-/**
- * Where to put the card: below the passage, aligned with its left edge, pulled back when
- * that would hang it off the right of the column.
- *
- * Only the horizontal axis is clamped. Vertically the card extends the page, which the
- * bottom padding on `main` leaves room for — flipping it above the passage instead would
- * have to react to scrolling to stay right.
- *
- * @param {Rect} anchor the passage, as one box
- * @param {number} cardWidth
- * @param {number} columnWidth
- * @param {number} gap space between passage and card
- * @returns {{top: number, left: number}}
- */
-export function placeCard(anchor, cardWidth, columnWidth, gap) {
-  const overflow = Math.max(0, anchor.left + cardWidth - columnWidth);
-  return {
-    top: anchor.bottom + gap,
-    left: Math.max(0, anchor.left - overflow),
-  };
 }

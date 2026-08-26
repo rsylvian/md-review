@@ -31,6 +31,8 @@ export type ReviewServerOptions = {
   filePath: string;
   /** The document under review. Read once, so anchors stay consistent. */
   source: string;
+  /** When the reviewed file was last modified, shown in the UI as "Updated ... ago". */
+  sourceModifiedAt?: string;
   sidecarPath: string;
   clientDir: string;
   /** Absolute path to htm/preact's self-contained ESM build. */
@@ -48,7 +50,7 @@ export type ReviewServer = {
   /** Resolves once the review has been finalised, by any route. */
   finished: Promise<FinalizeResult>;
   /** Finalise explicitly (used for SIGINT). Returns false if already finalised. */
-  finalize: (reason: FinalizeReason) => boolean;
+  finalize: (reason: FinalizeReason) => FinalizeResult | false;
   close: () => Promise<void>;
 };
 
@@ -116,7 +118,9 @@ function validate(payload: unknown, sourceLength: number): NewCommentRequest | s
 
   const body = typeof p.body === 'string' ? p.body : '';
   const suggestion = typeof p.suggestion === 'string' ? p.suggestion : undefined;
-  if (body.trim() === '' && (suggestion === undefined || suggestion.trim() === '')) {
+  // An explicit empty-string suggestion is a deletion — replace the passage with
+  // nothing — so it counts as an instruction on its own, unlike an absent suggestion.
+  if (body.trim() === '' && suggestion === undefined) {
     return 'a comment needs a body or a suggestion';
   }
 
@@ -141,6 +145,7 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
     graceMs = 1500,
     now = () => new Date().toISOString(),
     newId = () => randomUUID(),
+    sourceModifiedAt = now(),
   } = options;
 
   const clientRoot = resolve(clientDir);
@@ -176,7 +181,7 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
     }
   };
 
-  const finalize = (reason: FinalizeReason): boolean => {
+  const finalize = (reason: FinalizeReason): FinalizeResult | false => {
     if (finalized) return false;
     finalized = true;
     cancelGrace();
@@ -186,8 +191,13 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
       newlyResolved: state.newlyResolved,
       generatedAt: now(),
     };
-    resolveFinished({ reason, report: formatReport(input), payload: buildPayload(input) });
-    return true;
+    const result: FinalizeResult = {
+      reason,
+      report: formatReport(input),
+      payload: buildPayload(input),
+    };
+    resolveFinished(result);
+    return result;
   };
 
   const liveStreams = new Set<ServerResponse>();
@@ -268,6 +278,7 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
       sendJson(res, 200, {
         file: filePath,
         source,
+        sourceModifiedAt,
         html,
         open: state.open,
         resolved: state.resolved,
@@ -333,11 +344,12 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
     }
 
     if (pathname === '/api/finalize' && method === 'POST') {
-      if (!finalize('sent')) {
+      const result = finalize('sent');
+      if (result === false) {
         sendJson(res, 409, { error: 'review already finalised' });
         return;
       }
-      sendJson(res, 200, { ok: true });
+      sendJson(res, 200, { ok: true, report: result.report });
       return;
     }
 

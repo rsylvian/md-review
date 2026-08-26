@@ -176,11 +176,11 @@ test.describe('theme', () => {
     await page.mouse.move(box.x + box.width - 1, mid, { steps: 8 });
     await page.mouse.up();
 
-    const draft = page.locator('.card.draft');
-    await expect(draft).toBeVisible();
-    await draft.locator('textarea').first().fill('still works');
-    await draft.getByRole('button', { name: 'comment' }).click();
+    const composer = page.locator('.composer');
+    await expect(composer).toBeVisible();
+    await composer.locator('textarea').first().fill('still works');
+    await composer.getByRole('button', { name: 'comment', exact: true }).click();
 
-    await expect(page.locator('.card:not(.draft)')).toContainText('still works');
+    await expect(page.locator('.comment-row')).toContainText('still works');
   });
 });
