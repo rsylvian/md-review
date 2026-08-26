@@ -1,4 +1,12 @@
-import { html, render, useCallback, useEffect, useRef, useState } from './vendor/htm-preact.js';
+import {
+  html,
+  render,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from './vendor/htm-preact.js';
 import { anchorFromSelection } from './selection.js';
 import { anchorRects, paintHighlights } from './highlight.js';
 import { passageAtPoint } from './popover.js';
@@ -68,8 +76,11 @@ const TrashIcon = () => html`
 function ThemeToggle() {
   const [theme, setLocal] = useState(currentTheme);
 
-  // Follow the OS for as long as no choice has been stored.
-  useEffect(() => watchSystemTheme(setLocal), []);
+  // Follow the OS for as long as no choice has been stored. A layout effect so the
+  // listener is attached before the browser can dispatch a change event racing it —
+  // a plain useEffect defers attachment to the next animation frame, which can lose
+  // a change event that fires in between (see #27).
+  useLayoutEffect(() => watchSystemTheme(setLocal), []);
 
   const next = theme === 'dark' ? 'light' : 'dark';
   const flip = () => {
@@ -465,7 +476,11 @@ function App() {
   /** The one passage highlighted as active: a draft being composed, or the open row. */
   const shown = draft !== null ? draft : (open.find((c) => c.id === openId) ?? null);
 
-  useEffect(() => {
+  // A layout effect so CSS.highlights is repainted synchronously with the render that
+  // triggered it, rather than deferred to the next animation frame — a plain useEffect
+  // leaves a window where the DOM (e.g. a new .comment-row) has updated but the
+  // highlight paint hasn't caught up yet (see #27).
+  useLayoutEffect(() => {
     const root = docRef.current;
     if (root === null || doc === null) return;
     const repaint = () => paintHighlights(root, open, shown?.anchor ?? null);
@@ -521,8 +536,13 @@ function App() {
    * manage openId through their own handlers (row activation, delete) — without this
    * guard, every such click would also bubble here, hit-test against coordinates
    * nowhere near any passage, and immediately clear openId again.
+   *
+   * A layout effect, not a plain useEffect: this listener closes over `open`, so it
+   * must be torn down and re-added synchronously whenever `open` changes — otherwise a
+   * click landing before the next animation frame still hits the stale listener and
+   * hit-tests against last round's passages (see #27).
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onClick = (event) => {
       if (sent !== null) return;
       const root = docRef.current;
