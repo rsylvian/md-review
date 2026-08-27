@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { spawn } from 'node:child_process';
 import { readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { startReviewServer } from './server.ts';
 import { sidecarPathFor } from './store.ts';
 import { resolveClientRuntime } from './vendor.ts';
@@ -20,18 +21,18 @@ import { readVersion } from './version.ts';
 
 const PACKAGE_ROOT = join(import.meta.dirname, '..');
 
-type Options = {
+export type Options = {
   port: string;
   open: boolean;
   grace: string;
   installSkill?: boolean;
 };
 
-function note(message: string): void {
+export function note(message: string): void {
   process.stderr.write(`${message}\n`);
 }
 
-function openBrowser(url: string): void {
+export function openBrowser(url: string): void {
   const command =
     process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
   try {
@@ -47,7 +48,7 @@ function openBrowser(url: string): void {
   }
 }
 
-function readTarget(file: string): { absolute: string; source: string; modifiedAt: string } {
+export function readTarget(file: string): { absolute: string; source: string; modifiedAt: string } {
   const absolute = resolve(process.cwd(), file);
   let stats: ReturnType<typeof statSync>;
   try {
@@ -63,7 +64,7 @@ function readTarget(file: string): { absolute: string; source: string; modifiedA
   };
 }
 
-async function review(file: string, options: Options): Promise<void> {
+export async function review(file: string, options: Options): Promise<void> {
   const { source, modifiedAt } = readTarget(file);
   const sidecarPath = sidecarPathFor(file);
 
@@ -114,38 +115,47 @@ async function review(file: string, options: Options): Promise<void> {
   process.stdout.write(result.report);
 }
 
-const program = new Command();
+export function buildProgram(): Command {
+  const program = new Command();
 
-program
-  .name('md-review')
-  .description('Review a markdown file in the browser and hand the comments back to your agent.')
-  // Worth quoting in a bug report, so it goes to stdout like any other asked-for output.
-  .version(readVersion(PACKAGE_ROOT), '-v, --version', 'print the version and exit')
-  .argument('[file]', 'markdown file to review')
-  .option('-p, --port <number>', 'port to listen on', '5710')
-  .option('--no-open', 'do not open a browser automatically')
-  .option(
-    '--grace <ms>',
-    'how long to wait after the tab closes before finalising, so reloads do not end the review',
-    '1500',
-  )
-  .option('--install-skill', 'install the Claude Code skill into ~/.claude/skills and exit')
-  .action(async (file: string | undefined, options: Options) => {
-    try {
-      if (options.installSkill === true) {
-        const target = installSkill(PACKAGE_ROOT);
-        note(`Installed the md-review skill to ${target}`);
-        return;
+  program
+    .name('md-review')
+    .description('Review a markdown file in the browser and hand the comments back to your agent.')
+    // Worth quoting in a bug report, so it goes to stdout like any other asked-for output.
+    .version(readVersion(PACKAGE_ROOT), '-v, --version', 'print the version and exit')
+    .argument('[file]', 'markdown file to review')
+    .option('-p, --port <number>', 'port to listen on', '5710')
+    .option('--no-open', 'do not open a browser automatically')
+    .option(
+      '--grace <ms>',
+      'how long to wait after the tab closes before finalising, so reloads do not end the review',
+      '1500',
+    )
+    .option('--install-skill', 'install the Claude Code skill into ~/.claude/skills and exit')
+    .action(async (file: string | undefined, options: Options) => {
+      try {
+        if (options.installSkill === true) {
+          const target = installSkill(PACKAGE_ROOT);
+          note(`Installed the md-review skill to ${target}`);
+          return;
+        }
+        if (file === undefined) {
+          program.help({ error: true });
+          return;
+        }
+        await review(file, options);
+      } catch (error) {
+        note(`md-review: ${error instanceof Error ? error.message : String(error)}`);
+        process.exitCode = 1;
       }
-      if (file === undefined) {
-        program.help({ error: true });
-        return;
-      }
-      await review(file, options);
-    } catch (error) {
-      note(`md-review: ${error instanceof Error ? error.message : String(error)}`);
-      process.exitCode = 1;
-    }
-  });
+    });
 
-await program.parseAsync(process.argv);
+  return program;
+}
+
+// Only parse when run as the entry point, not when imported by tests.
+const isMain =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (isMain) {
+  await buildProgram().parseAsync(process.argv);
+}
