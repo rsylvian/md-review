@@ -15,7 +15,6 @@ export default defineConfig({
       // Only src/ is exercised by this run; client/ has no test coverage of its own yet,
       // and test/e2e's Playwright specs aren't part of this process.
       include: ['src/**'],
-      exclude: ['src/cli.ts'],
       thresholds: {
         statements: 90,
         branches: 80,
