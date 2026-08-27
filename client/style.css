@@ -613,12 +613,11 @@ main {
 /* ---------- comment rows ---------- */
 
 .comment-row {
-  padding: 11px 12px;
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: transparent;
   margin-bottom: 10px;
-  cursor: pointer;
   transition:
     background-color 0.1s ease-out,
     border-color 0.1s ease-out;
@@ -629,17 +628,38 @@ main {
   background: var(--bg);
 }
 
+.comment-row-button {
+  display: block;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.comment-row-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .comment-row .head {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.35rem;
+  padding-right: 1.5rem;
 }
 
-.comment-row .head .icon-button {
+.comment-row .icon-button {
+  position: absolute;
+  top: 9px;
+  right: 10px;
   width: 1.5rem;
   height: 1.5rem;
-  margin: -0.2rem 0;
 }
 
 .pill {
@@ -666,6 +686,7 @@ main {
 }
 
 .comment-row .body {
+  display: block;
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
@@ -673,6 +694,7 @@ main {
 }
 
 .row-suggestion {
+  display: block;
   margin-top: 6px;
   padding: 0.4rem 0.5rem;
   border-left: 2px solid var(--accent);

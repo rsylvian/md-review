@@ -276,36 +276,42 @@ function CommentRow({ comment, active, onActivate, onDelete }) {
     <article
       data-id=${comment.id}
       class=${`comment-row${active ? ' active' : ''}`}
-      onClick=${onActivate}
     >
-      <div class="head">
-        <span class="lines muted">${lineLabel('', comment.anchor)}</span>
+      <button
+        type="button"
+        class="comment-row-button"
+        onClick=${onActivate}
+        aria-pressed=${active}
+      >
+        <span class="head">
+          <span class="lines muted">${lineLabel('', comment.anchor)}</span>
+          ${
+            comment.suggestion === undefined
+              ? null
+              : comment.suggestion === ''
+                ? html`<span class="pill pill-delete">deletion</span>`
+                : html`<span class="pill">rewrite</span>`
+          }
+        </span>
+        ${comment.body.trim() === '' ? null : html`<span class="body">${comment.body}</span>`}
         ${
-          comment.suggestion === undefined
+          comment.suggestion === undefined || comment.suggestion === ''
             ? null
-            : comment.suggestion === ''
-              ? html`<span class="pill pill-delete">deletion</span>`
-              : html`<span class="pill">rewrite</span>`
+            : html`<span class="row-suggestion">${comment.suggestion}</span>`
         }
-        <span class="spacer"></span>
-        <button
-          class="icon-button danger"
-          title="Delete this comment"
-          aria-label="Delete this comment"
-          onClick=${(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-        >
-          <${TrashIcon} />
-        </button>
-      </div>
-      ${comment.body.trim() === '' ? null : html`<p class="body">${comment.body}</p>`}
-      ${
-        comment.suggestion === undefined || comment.suggestion === ''
-          ? null
-          : html`<pre class="row-suggestion">${comment.suggestion}</pre>`
-      }
+      </button>
+      <button
+        type="button"
+        class="icon-button danger"
+        title="Delete this comment"
+        aria-label="Delete this comment"
+        onClick=${(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+      >
+        <${TrashIcon} />
+      </button>
     </article>
   `;
 }
@@ -488,16 +494,63 @@ function App() {
     document.fonts?.ready.then(repaint);
   }, [doc, draft, openId]);
 
+  const activate = useCallback(
+    (id) => {
+      setOpenId(id);
+      const comment = open.find((c) => c.id === id);
+      if (comment !== undefined && docScrollerRef.current !== null && docRef.current !== null) {
+        scrollPassageIntoView(docScrollerRef.current, docRef.current, comment.anchor);
+      }
+    },
+    [open],
+  );
+
   useEffect(() => {
     const onKey = (event) => {
-      if (event.key !== 'Escape') return;
-      if (draft !== null) setDraft(null);
-      else if (panelOpen) setPanelOpen(false);
-      else setOpenId(null);
+      if (event.key === 'Escape') {
+        if (draft !== null) setDraft(null);
+        else if (panelOpen) setPanelOpen(false);
+        else setOpenId(null);
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (draft !== null || open.length === 0) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')
+      ) {
+        return;
+      }
+
+      if (event.key === 'ArrowDown' || event.key === 'j') {
+        event.preventDefault();
+        const currentIndex = open.findIndex((c) => c.id === openId);
+        const nextIndex = currentIndex === -1 ? 0 : Math.min(open.length - 1, currentIndex + 1);
+        const nextComment = open[nextIndex];
+        if (nextComment) {
+          activate(nextComment.id);
+          panelListRef.current
+            ?.querySelector(`[data-id="${nextComment.id}"] .comment-row-button`)
+            ?.focus();
+        }
+      } else if (event.key === 'ArrowUp' || event.key === 'k') {
+        event.preventDefault();
+        const currentIndex = open.findIndex((c) => c.id === openId);
+        const prevIndex = currentIndex === -1 ? open.length - 1 : Math.max(0, currentIndex - 1);
+        const prevComment = open[prevIndex];
+        if (prevComment) {
+          activate(prevComment.id);
+          panelListRef.current
+            ?.querySelector(`[data-id="${prevComment.id}"] .comment-row-button`)
+            ?.focus();
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [draft, panelOpen]);
+  }, [draft, panelOpen, open, openId, activate]);
 
   const startDraft = useCallback(() => {
     if (sent !== null) return;
@@ -578,14 +631,6 @@ function App() {
       ?.querySelector(`[data-id="${openId}"]`)
       ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [openId]);
-
-  const activate = (id) => {
-    setOpenId(id);
-    const comment = open.find((c) => c.id === id);
-    if (comment !== undefined && docScrollerRef.current !== null && docRef.current !== null) {
-      scrollPassageIntoView(docScrollerRef.current, docRef.current, comment.anchor);
-    }
-  };
 
   const save = async () => {
     setPending('comment');

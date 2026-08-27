@@ -748,4 +748,52 @@ test.describe('review loop', () => {
     await selectWord(page, 'consectetur');
     await expect(panel).toHaveAttribute('data-open', 'true');
   });
+
+  test('comment rows can be focused and activated via keyboard', async ({ page }) => {
+    session = await startReview();
+    await page.goto(session.url);
+
+    for (const [word, body] of [
+      ['consectetur', 'first comment'],
+      ['Goals', 'second comment'],
+    ]) {
+      await selectWord(page, word!);
+      await page.locator('.composer textarea').first().fill(body!);
+      await page.locator('.composer').getByRole('button', { name: 'comment', exact: true }).click();
+      await expect(page.locator('.comment-row', { hasText: body! })).toHaveCount(1);
+    }
+
+    // Dismiss the active selection so neither row is active.
+    await clickWord(page, 'Platform');
+    await expect(page.locator('.comment-row.active')).toHaveCount(0);
+
+    const firstRowBtn = page
+      .locator('.comment-row', { hasText: 'first comment' })
+      .locator('.comment-row-button');
+    const secondRowBtn = page
+      .locator('.comment-row', { hasText: 'second comment' })
+      .locator('.comment-row-button');
+
+    // Focus and activate the first row button via keyboard.
+    await firstRowBtn.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.comment-row.active')).toHaveCount(1);
+    await expect(page.locator('.comment-row.active')).toContainText('first comment');
+
+    // Focus and activate the second row button via keyboard using Space.
+    await secondRowBtn.focus();
+    await page.keyboard.press('Space');
+    await expect(page.locator('.comment-row.active')).toHaveCount(1);
+    await expect(page.locator('.comment-row.active')).toContainText('second comment');
+
+    // Tab to the delete button of the second row and activate it via Enter.
+    const secondRowDelete = page
+      .locator('.comment-row', { hasText: 'second comment' })
+      .getByRole('button', { name: 'Delete this comment' });
+    await secondRowDelete.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(page.locator('.comment-row')).toHaveCount(1);
+    await expect(page.locator('.comment-row')).toContainText('first comment');
+  });
 });
