@@ -368,7 +368,27 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
     });
   });
 
-  await new Promise<void>((ready) => server.listen(port, '127.0.0.1', ready));
+  await new Promise<void>((ready, fail) => {
+    const onError = (error: NodeJS.ErrnoException): void => {
+      server.off('listening', onListening);
+      if (error.code === 'EADDRINUSE') {
+        fail(
+          new Error(
+            `port ${port} is already in use — is another md-review already running? Pass --port <n> (or --port 0 for a free one) to use a different port.`,
+          ),
+        );
+      } else {
+        fail(error);
+      }
+    };
+    const onListening = (): void => {
+      server.off('error', onError);
+      ready();
+    };
+    server.once('error', onError);
+    server.once('listening', onListening);
+    server.listen(port, '127.0.0.1');
+  });
   const address = server.address();
   const actualPort = typeof address === 'object' && address !== null ? address.port : port;
 
