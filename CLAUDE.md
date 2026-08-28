@@ -10,7 +10,7 @@ There is no bundler or framework on the client — `client/*.js` is plain ESM se
 
 ## Commands
 
-Needs Node ≥26 (see `.nvmrc`; local dev may warn/fail under an older Node — that's an environment issue, not a code issue).
+Needs Node ≥24 (see `.nvmrc`; local dev may warn/fail under an older Node — that's an environment issue, not a code issue).
 
 ```
 yarn install
