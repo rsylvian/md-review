@@ -6,6 +6,13 @@ on:
   push:
     branches: [main]
 
+# actions/setup-node's registry-url always writes an .npmrc referencing
+# ${NODE_AUTH_TOKEN}, even though publishing here goes through OIDC trusted
+# publishing and never reads it. Without this, yarn's env interpolation
+# blows up on the undefined var before any of our steps run.
+env:
+  NODE_AUTH_TOKEN: ''
+
 jobs:
   publish-preview:
     if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'preview')
