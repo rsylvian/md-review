@@ -1,35 +1,40 @@
-# md-review
+<h1 align="center">md-review</h1>
 
-[![CI](https://github.com/rsylvian/md-review/actions/workflows/ci.yml/badge.svg)](https://github.com/rsylvian/md-review/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <a href="https://www.npmjs.com/package/@rsylvian/md-review"><img src="https://img.shields.io/npm/v/@rsylvian/md-review.svg" alt="npm version"></a>
+  <a href="https://github.com/rsylvian/md-review/actions/workflows/ci.yml"><img src="https://github.com/rsylvian/md-review/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
-Review markdown in your browser, hand the comments back to the agent.
+<p align="center">
+  Review markdown in your browser, hand the comments back to the agent.
+</p>
 
-## Install
+## ⚡ Quick Start
 
-Needs **Node 26 or newer**.
+Try it first
 
-**Recommended:**
-```
+```bash
 npx @rsylvian/md-review draft.md
 ```
-or install globally:
-```
+
+Install and use
+
+```bash
 npm i -g @rsylvian/md-review
+md-review draft.md
 ```
 
-**From source:**
-```
-git clone https://github.com/rsylvian/md-review.git
-cd md-review
-yarn install
-npm link
-md-review --install-skill   # optional, Claude Code only
+Enable use from Claude Code
+
+```bash
+md-review --install-skill
 ```
 
-To upgrade a source install: `git pull && yarn install`.
+Installs a skill to `~/.claude/skills/md-review/` that teaches the agent to run the command
+backgrounded, wait rather than poll, and read the result. After that, "let me review that
+first" is enough.
 
-## The loop
+## 🔁 The loop
 
 1. The agent runs `md-review draft.md` in the background and waits.
 2. You read the rendered page and highlight anything that needs work.
@@ -40,56 +45,66 @@ On round 2, comments carry over. Any comment whose highlighted passage the agent
 **auto-resolved** and collapsed into a `Resolved (n)` strip; anything still unaddressed
 comes back live on its passage, even if the surrounding text moved.
 
-## Reviewing
+## 💬 Reviewing
 
-- **Highlight any text** to comment on it. The comment automatically attaches to that
-  passage so it survives the agent editing around it.
-- **Click a highlighted passage** to reopen its comment.
-- **Suggest a rewrite** to give the agent exact replacement text instead of a description.
-- **Send** ends the review without closing the tab.
+Highlight any text to open a comment on it. The comment automatically attaches to that
+passage so it survives the agent editing around it; click a highlighted passage to reopen
+its comment. Each comment is one of three kinds:
 
-## Claude Code
+- **Note** — describe what should change, in your own words.
+- **Rewrite** — give the agent exact replacement text instead of a description.
+- **Delete** — mark the highlighted passage for removal outright.
 
-```
-md-review --install-skill
-```
+**Send** ends the review without closing the tab.
 
-Installs a skill to `~/.claude/skills/md-review/` that teaches the agent to run the command
-backgrounded, wait rather than poll, and read the result. After that, "let me review that
-first" is enough.
+## ⚙️ CLI Options
 
-## Options
+| Flag              | Default | Description                                      |
+| ----------------- | ------- | ------------------------------------------------- |
+| `<file>`          | -       | Markdown file to review                            |
+| `-p, --port <n>`  | `5710`  | Port to listen on; `0` picks a free port           |
+| `--no-open`       | false   | Don't launch a browser automatically               |
+| `--grace <ms>`    | `1500`  | How long after the tab closes before finalising    |
+| `--install-skill` | -       | Install the Claude Code skill and exit             |
+| `-v, --version`   | -       | Print the version and exit                         |
 
-| Flag | Default | |
-| ---- | ------- | - |
-| `-p, --port <n>` | `5710` | `0` picks a free port |
-| `--no-open` | | don't launch a browser |
-| `--grace <ms>` | `1500` | how long after the tab closes before finalising |
-| `--install-skill` | | install the Claude Code skill and exit |
-| `-v, --version` | | print the version and exit |
+## 📋 Notes and limits
 
-## Notes and limits
-
-- **One file per session.**
+- **One file per session.** To review several documents, run it once per file.
 - **The document is read once.** Editing the file while a review is open won't update the page.
 - **Raw HTML in markdown is dropped** rather than rendered.
 - Comments live in `~/.cache/md-review/`.
 
-## Preview builds
+## 📦 Preview builds
 
 Adding the `preview` label to a PR publishes a one-off build under the `pr-<number>`
 dist-tag (republished on every new push while the label is attached):
 
-```
+```bash
 npx @rsylvian/md-review@pr-<number>
 ```
 
-## Development
+## 🛠️ Development
 
-```
+Needs **Node 24 or newer**.
+
+```bash
+git clone https://github.com/rsylvian/md-review.git
+cd md-review
 yarn install
+npm link
+md-review --install-skill   # optional, Claude Code only
+```
+
+To upgrade a source install: `git pull && yarn install`.
+
+```bash
 yarn test          # unit + server integration
 yarn test:e2e      # full browser loop; builds first, uses your installed Chrome
 yarn typecheck
-yarn lint          # biome check .; yarn lint:fix to apply fixes
+yarn lint           # biome check .; yarn lint:fix to apply fixes
 ```
+
+## 📄 License
+
+MIT
