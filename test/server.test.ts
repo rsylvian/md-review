@@ -100,6 +100,13 @@ describe('review server', () => {
     expect(doc.resolved).toEqual([]);
   });
 
+  it('rejects with a clear error when the port is already in use', async () => {
+    const first = await start();
+    await expect(start({ port: first.port })).rejects.toThrow(
+      `port ${first.port} is already in use — is another md-review already running? Pass --port <n> (or --port 0 for a free one) to use a different port.`,
+    );
+  });
+
   it('serves the review page and the vendored client runtime', async () => {
     const { url } = await start();
 
