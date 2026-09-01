@@ -75,6 +75,13 @@ If a comment comes back open and you believe you did address it, you changed som
 other than the passage the user highlighted. Re-read that passage and either change it or
 say plainly why you left it.
 
+Before telling the user you're done, or before launching another round, confirm your edits
+actually landed: `md-review path/to/draft.md --stat` re-anchors the existing comments
+against the file as it now stands and prints counts — no server, no browser, no user
+involved. Unlike the command above, run it in the foreground and read its output directly;
+there is nothing to wait on. It catches a comment you thought you addressed but didn't. Add
+`--json` for a machine-readable `{ file, openCount, resolvedCount }`.
+
 ## Notes
 
 - One file per session. To review several documents, run it once per file.

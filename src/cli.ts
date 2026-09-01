@@ -4,8 +4,9 @@ import { spawn } from 'node:child_process';
 import { readFileSync, statSync, writeFileSync, mkdirSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { reanchor } from './anchors.ts';
 import { startReviewServer } from './server.ts';
-import { sidecarPathFor } from './store.ts';
+import { loadReview, sidecarPathFor } from './store.ts';
 import { resolveClientRuntime } from './vendor.ts';
 import { installSkill } from './skill.ts';
 import { readVersion } from './version.ts';
@@ -26,6 +27,8 @@ export type Options = {
   open: boolean;
   grace: string;
   installSkill?: boolean;
+  stat?: boolean;
+  json?: boolean;
 };
 
 export function note(message: string): void {
@@ -115,6 +118,25 @@ export async function review(file: string, options: Options): Promise<void> {
   process.stdout.write(result.report);
 }
 
+/**
+ * `--stat`: a read-only status check. Re-anchors the sidecar's comments against the
+ * current file content, exactly like a real review round would, but never persists the
+ * result — the point is to answer "is there still an open review here" without
+ * committing to starting one.
+ */
+export function printStat(file: string, json = false): void {
+  const { source } = readTarget(file);
+  const prior = loadReview(sidecarPathFor(file));
+  const { open, resolved } = reanchor(prior?.comments ?? [], source);
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify({ file, openCount: open.length, resolvedCount: resolved.length })}\n`,
+    );
+    return;
+  }
+  process.stdout.write(`${file} — ${open.length} open, ${resolved.length} resolved.\n`);
+}
+
 export function buildProgram(): Command {
   const program = new Command();
 
@@ -132,6 +154,11 @@ export function buildProgram(): Command {
       '1500',
     )
     .option('--install-skill', 'install the Claude Code skill into ~/.claude/skills and exit')
+    .option(
+      '--stat',
+      'print open/resolved comment counts for the file and exit, without a server or browser',
+    )
+    .option('--json', 'with --stat, print JSON instead of plaintext')
     .action(async (file: string | undefined, options: Options) => {
       try {
         if (options.installSkill === true) {
@@ -141,6 +168,10 @@ export function buildProgram(): Command {
         }
         if (file === undefined) {
           program.help({ error: true });
+          return;
+        }
+        if (options.stat === true) {
+          printStat(file, options.json === true);
           return;
         }
         await review(file, options);
