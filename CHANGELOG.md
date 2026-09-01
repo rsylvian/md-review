@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/rsylvian/md-review/compare/v0.2.1...v0.3.0) (2026-09-01)
+
+
+### Features
+
+* add --stat flag for a lightweight review status check ([#52](https://github.com/rsylvian/md-review/issues/52)) ([305257d](https://github.com/rsylvian/md-review/commit/305257dc088d586a51e01b0a895d1223e3f94426)), closes [#43](https://github.com/rsylvian/md-review/issues/43)
+
 ## [0.2.1](https://github.com/rsylvian/md-review/compare/v0.2.0...v0.2.1) (2026-09-01)
 
 
