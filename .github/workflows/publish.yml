@@ -63,7 +63,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Comment install command on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const marker = '<!-- md-review-preview-comment -->';
