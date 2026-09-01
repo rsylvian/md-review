@@ -86,7 +86,7 @@ npx @rsylvian/md-review@pr-<number>
 
 ## 🛠️ Development
 
-Needs **Node 24 or newer**.
+Needs **Node 22.12 or newer**.
 
 ```bash
 git clone https://github.com/rsylvian/md-review.git
