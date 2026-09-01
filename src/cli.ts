@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { spawn } from 'node:child_process';
-import { readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, statSync, writeFileSync, mkdirSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { startReviewServer } from './server.ts';
@@ -153,9 +153,15 @@ export function buildProgram(): Command {
   return program;
 }
 
-// Only parse when run as the entry point, not when imported by tests.
+// Only parse when run as the entry point, not when imported by tests. Compared via
+// realpathSync rather than resolve(): Node canonicalizes symlinks when it resolves
+// import.meta.url for an ES module, but resolve() does not touch symlinks — so a global
+// npm install, whose bin is a symlink into lib/node_modules, would otherwise fail this
+// comparison and silently no-op instead of parsing argv (see the investigation this
+// fixes: md-review --help printed nothing when run through such a symlink).
 const isMain =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 if (isMain) {
   await buildProgram().parseAsync(process.argv);
 }
