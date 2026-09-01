@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/rsylvian/md-review/compare/v0.2.0...v0.2.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* lower minimum Node version requirement to 22.12 ([#51](https://github.com/rsylvian/md-review/issues/51)) ([5e990df](https://github.com/rsylvian/md-review/commit/5e990df943efbb1c98346bc5ba4e83472aa7753a)), closes [#50](https://github.com/rsylvian/md-review/issues/50)
+* parse argv through a symlinked bin ([#48](https://github.com/rsylvian/md-review/issues/48)) ([15a31ac](https://github.com/rsylvian/md-review/commit/15a31ac607680714dffe60491ada47890b4ded8d))
+
 ## [0.2.0](https://github.com/rsylvian/md-review/compare/v0.1.0...v0.2.0) (2026-08-28)
 
 
