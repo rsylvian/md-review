@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { readTarget, openBrowser, note, buildProgram, review } from '../src/cli.ts';
-import { sidecarPathFor } from '../src/store.ts';
+import { readTarget, openBrowser, note, buildProgram, review, printStat } from '../src/cli.ts';
+import { sidecarPathFor, saveReview } from '../src/store.ts';
+import { makeComment } from './helpers/comments.ts';
 
 // Module-level mock for node:child_process — vi.mock is always hoisted.
 const spawnMock = vi.fn();
@@ -226,6 +227,109 @@ describe('review', () => {
 });
 
 // ---------------------------------------------------------------------------
+// printStat
+// ---------------------------------------------------------------------------
+
+describe('printStat', () => {
+  // printStat resolves the sidecar path the same way production code does (real cache
+  // home), so clean up whatever it writes there — read-only, so nothing should exist,
+  // but this keeps the test honest if that ever changes.
+  const cleanupSidecar = (file: string): void => {
+    const sidecarPath = sidecarPathFor(file);
+    rmSync(sidecarPath, { force: true });
+    rmSync(`${sidecarPath.replace(/\.json$/, '')}.review.md`, { force: true });
+  };
+
+  it('prints 0 open, 0 resolved when there is no prior review', () => {
+    const file = join(root, 'fresh.md');
+    writeFileSync(file, '# Fresh\nNothing reviewed yet.\n', 'utf8');
+
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    try {
+      printStat(file);
+      expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('0 open, 0 resolved'));
+    } finally {
+      cleanupSidecar(file);
+    }
+  });
+
+  it('counts open comments and re-anchors resolved ones against current content', () => {
+    const file = join(root, 'stat-doc.md');
+    const original = '# Title\n\nFirst passage.\n\nSecond passage.\n';
+    writeFileSync(file, original, 'utf8');
+
+    const sidecarPath = sidecarPathFor(file);
+    const stillPresent = makeComment(original, 'First passage.', { id: 'c1' });
+    const rewrittenAway = makeComment(original, 'Second passage.', { id: 'c2' });
+    saveReview(sidecarPath, {
+      file,
+      comments: [stillPresent, rewrittenAway],
+      updatedAt: '2026-08-13T00:00:00.000Z',
+    });
+
+    // The agent rewrote the second passage since the sidecar was last saved.
+    writeFileSync(file, '# Title\n\nFirst passage.\n\nRewritten entirely.\n', 'utf8');
+
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    try {
+      printStat(file);
+      expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('1 open, 1 resolved'));
+    } finally {
+      cleanupSidecar(file);
+    }
+  });
+
+  it('does not write back to the sidecar', () => {
+    const file = join(root, 'readonly.md');
+    const original = 'Only passage here.\n';
+    writeFileSync(file, original, 'utf8');
+
+    const sidecarPath = sidecarPathFor(file);
+    const comment = makeComment(original, 'Only passage here.', { id: 'c1' });
+    saveReview(sidecarPath, { file, comments: [comment], updatedAt: '2026-08-13T00:00:00.000Z' });
+
+    writeFileSync(file, 'Totally different content now.\n', 'utf8');
+    const before = readFileSync(sidecarPath, 'utf8');
+
+    vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    try {
+      printStat(file);
+      expect(readFileSync(sidecarPath, 'utf8')).toBe(before);
+    } finally {
+      cleanupSidecar(file);
+    }
+  });
+
+  it('throws for a file that does not exist', () => {
+    expect(() => printStat(join(root, 'nope.md'))).toThrow(/no such file/);
+  });
+
+  it('prints JSON when json is true', () => {
+    const file = join(root, 'json-doc.md');
+    const original = '# Title\n\nFirst passage.\n\nSecond passage.\n';
+    writeFileSync(file, original, 'utf8');
+
+    const sidecarPath = sidecarPathFor(file);
+    const stillPresent = makeComment(original, 'First passage.', { id: 'c1' });
+    saveReview(sidecarPath, {
+      file,
+      comments: [stillPresent],
+      updatedAt: '2026-08-13T00:00:00.000Z',
+    });
+
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    try {
+      printStat(file, true);
+      expect(stdoutSpy).toHaveBeenCalledWith(
+        `${JSON.stringify({ file, openCount: 1, resolvedCount: 0 })}\n`,
+      );
+    } finally {
+      cleanupSidecar(file);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // buildProgram (option parsing and action handling)
 // ---------------------------------------------------------------------------
 
@@ -273,6 +377,58 @@ describe('buildProgram', () => {
     expect(parsedOpts!.port).toBe('5710');
     expect(parsedOpts!.open).toBe(true);
     expect(parsedOpts!.grace).toBe('1500');
+  });
+
+  it('parses --stat', async () => {
+    const program = buildProgram();
+    let parsedOpts: Record<string, unknown> | undefined;
+
+    program.action((_file: string | undefined, opts: Record<string, unknown>) => {
+      parsedOpts = opts;
+    });
+
+    await program.parseAsync(['node', 'md-review', '--stat', 'doc.md']);
+
+    expect(parsedOpts).toBeDefined();
+    expect(parsedOpts!.stat).toBe(true);
+  });
+
+  it('runs printStat instead of review for --stat', async () => {
+    const file = join(root, 'stat-action.md');
+    writeFileSync(file, '# Doc\nSome content.\n', 'utf8');
+    const sidecarPath = sidecarPathFor(file);
+
+    const program = buildProgram();
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    try {
+      await program.parseAsync(['node', 'md-review', '--stat', file]);
+
+      expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('0 open, 0 resolved'));
+      // No server was started, so nothing was written to the sidecar.
+      expect(existsSync(sidecarPath)).toBe(false);
+    } finally {
+      rmSync(sidecarPath, { force: true });
+    }
+  });
+
+  it('passes --json through to printStat', async () => {
+    const file = join(root, 'stat-json-action.md');
+    writeFileSync(file, '# Doc\nSome content.\n', 'utf8');
+    const sidecarPath = sidecarPathFor(file);
+
+    const program = buildProgram();
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    try {
+      await program.parseAsync(['node', 'md-review', '--stat', '--json', file]);
+
+      expect(stdoutSpy).toHaveBeenCalledWith(
+        `${JSON.stringify({ file, openCount: 0, resolvedCount: 0 })}\n`,
+      );
+    } finally {
+      rmSync(sidecarPath, { force: true });
+    }
   });
 
   it('executes the real action for --install-skill', async () => {

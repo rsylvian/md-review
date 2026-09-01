@@ -66,6 +66,8 @@ its comment. Each comment is one of three kinds:
 | `--no-open`       | false   | Don't launch a browser automatically               |
 | `--grace <ms>`    | `1500`  | How long after the tab closes before finalising    |
 | `--install-skill` | -       | Install the Claude Code skill and exit             |
+| `--stat`          | -       | Print open/resolved comment counts and exit, without a server or browser |
+| `--json`          | -       | With `--stat`, print JSON instead of plaintext     |
 | `-v, --version`   | -       | Print the version and exit                         |
 
 ## 📋 Notes and limits
